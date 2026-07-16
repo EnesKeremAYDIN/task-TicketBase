@@ -4,6 +4,7 @@ import fjwt from '@fastify/jwt';
 import { authMiddleware } from './middleware/auth';
 import { tenantMiddleware } from './middleware/tenant';
 import { authRoutes } from './routes/auth';
+import { ticketRoutes } from './routes/ticket';
 import { AppError } from './lib/errors';
 
 const app = Fastify({ logger: true });
@@ -33,6 +34,7 @@ const start = async () => {
   app.addHook('onRequest', tenantMiddleware);
 
   await app.register(authRoutes);
+  await app.register(ticketRoutes);
 
   try {
     await app.listen({ port: Number(process.env.PORT) || 3000, host: '0.0.0.0' });

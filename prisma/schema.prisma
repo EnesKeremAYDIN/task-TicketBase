@@ -115,6 +115,11 @@ model InboundMessage {
   @@index([status])
 }
 
+model TicketCounter {
+  tenantId   String @id
+  lastNumber Int
+}
+
 model Holiday {
   id       String   @id @default(cuid())
   tenantId String

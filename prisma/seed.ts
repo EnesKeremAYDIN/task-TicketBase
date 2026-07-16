@@ -208,6 +208,10 @@ async function main() {
       await prisma.comment.createMany({ data: comments });
     }
 
+    await prisma.ticketCounter.create({
+      data: { tenantId: tenant.id, lastNumber: ticketCount },
+    });
+
     console.log(`  ${tenantData.name} tamamlandı.`);
   }
 

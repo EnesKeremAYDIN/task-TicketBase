@@ -25,3 +25,11 @@ Spec'te JWT süresi belirtilmemişti. 7 gün olarak belirlendi — işe alım ta
 ## 2026-07-16 — Login Hata Mesajları ve Timing Attack Koruması
 
 Login hata mesajları daha doğal Türkçe olacak şekilde güncellendi: "Şifre gereklidir" → "Şifre zorunludur", "Geçerli bir e-posta girin" → "Geçerli bir e-posta adresi giriniz". Ayrıca account enumeration saldırılarına karşı timing attack koruması eklendi: kullanıcı var/yok fark etmeksizin bcrypt her durumda çalışacak şekilde dummy hash kullanıldı. (AI önerisi: bu düzeltmeyi AI önerdi — timing attack riskini ilk o fark etti, kabul edildi.)
+
+## 2026-07-16 — Ticket Counter ve Sequental Number Üretimi
+
+Ticket numaralarının race condition olmadan üretilmesi için ayrı bir TicketCounter modeli oluşturuldu. Prisma transaction içinde atomic increment yapılıyor. SQLite'ın serialized isolation seviyesi sayesinde 20 paralel istekte bile 20 benzersiz numara üretildi (race-test ile doğrulandı). (AI önerisi: max+1 yaklaşımını önerdi, ancak 100k kayıtta performans sorunu yaratacağı için counter tablosu tercih edildi.)
+
+## 2026-07-16 — State Machine Tasarımı
+
+Ticket durum geçişleri için ayrı bir state-machine modülü oluşturuldu. Geçerli geçişler: new→open→pending→resolved→closed. Her geçiş route'da validate ediliyor. Müşteri sadece kendi ticket'ını görebiliyor, agent/admin tüm ticket'ları görüyor. Customer ticket listesini göremiyor (sadece detay).
