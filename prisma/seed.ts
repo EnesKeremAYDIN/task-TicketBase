@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { calculateSLADeadlines } from '../src/backend/services/sla';
 
 const prisma = new PrismaClient();
 
@@ -235,6 +236,13 @@ async function main() {
       where: { tenantId: tenant.id },
       select: { id: true, customerId: true, assignedToId: true, status: true, createdAt: true },
     });
+
+    console.log(`  SLA deadline'lar hesaplanıyor...`);
+    const slaBatch = 500;
+    for (let i = 0; i < allTickets.length; i += slaBatch) {
+      const batch = allTickets.slice(i, i + slaBatch);
+      await Promise.all(batch.map((t) => calculateSLADeadlines(t.id, tenant.id).catch(() => {})));
+    }
 
     const commentCount = 100000;
     console.log(`  ${commentCount} yorum oluşturuluyor...`);
