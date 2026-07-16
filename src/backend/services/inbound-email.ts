@@ -13,14 +13,6 @@ interface InboundPayload {
 const TICKET_PATTERN = /[A-Z]+-(\d+)/i;
 
 export async function processInboundEmail(payload: InboundPayload) {
-  const existing = await prisma.inboundMessage.findUnique({
-    where: { messageId: payload.messageId },
-  });
-
-  if (existing) {
-    return { status: 'duplicate', message: 'Bu mesaj daha önce işlenmiş' };
-  }
-
   const tenant = await prisma.tenant.findUnique({
     where: { slug: payload.tenant },
   });
@@ -30,7 +22,16 @@ export async function processInboundEmail(payload: InboundPayload) {
     throw new ValidationError('Geçersiz tenant');
   }
 
-  const inboundMessage = await saveInboundMessage(payload, tenant.id, 'processing');
+  let inboundMessage = await saveInboundMessage(payload, tenant.id, 'processing').catch((err: { code?: string }) => {
+    if (err?.code === 'P2002') {
+      return null;
+    }
+    throw err;
+  });
+
+  if (!inboundMessage) {
+    return { status: 'duplicate', message: 'Bu mesaj daha önce işlenmiş' };
+  }
 
   try {
     const subject = payload.subject || '';
@@ -95,10 +96,10 @@ export async function processInboundEmail(payload: InboundPayload) {
     return { status: 'processed', message: 'Yeni ticket oluşturuldu', ticketId: newTicket.id };
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) {
-      await updateInboundStatus(inboundMessage.id, 'failed');
+      await updateInboundStatus(inboundMessage.id, 'failed').catch(() => {});
       throw error;
     }
-    await updateInboundStatus(inboundMessage.id, 'failed');
+    await updateInboundStatus(inboundMessage.id, 'failed').catch(() => {});
     throw error;
   }
 }

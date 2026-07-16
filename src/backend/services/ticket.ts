@@ -24,12 +24,13 @@ interface ListTicketsParams {
 
 export async function createTicket(data: CreateTicketData, customerId: string, tenantId: string, tenantSlug: string) {
   const ticket = await prisma.$transaction(async (tx) => {
-    const counter = await tx.ticketCounter.update({
+    const counter = await tx.ticketCounter.upsert({
       where: { tenantId },
-      data: { lastNumber: { increment: 1 } },
+      create: { tenantId, lastNumber: 1 },
+      update: { lastNumber: { increment: 1 } },
     });
 
-    const displayId = `${tenantSlug.toUpperCase()}-${counter.lastNumber}`;
+    const displayId = `${tenantSlug.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-${counter.lastNumber}`;
 
     return tx.ticket.create({
       data: {
@@ -146,9 +147,17 @@ export async function updateTicketStatus(ticketId: string, tenantId: string, new
     updateData.closedAt = new Date();
   }
 
-  const updated = await prisma.ticket.update({
-    where: { id: ticketId },
+  const result = await prisma.ticket.updateMany({
+    where: { id: ticketId, tenantId, status: ticket.status },
     data: updateData,
+  });
+
+  if (result.count === 0) {
+    throw new ValidationError('Ticket durumu değişti, işlem tekrar denenmeli');
+  }
+
+  const updated = await prisma.ticket.findFirst({
+    where: { id: ticketId, ...tenantFilter(tenantId) },
   });
 
   return updated;

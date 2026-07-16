@@ -1,0 +1,61 @@
+.errorCard {
+  text-align: center; padding: 40px 20px;
+}
+.errorMsg {
+  font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 16px;
+}
+.ticketHeader {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;
+}
+.backBtn {
+  background: none; border: none; cursor: pointer; font-size: 1.2rem;
+  color: var(--text-secondary); padding: 0; line-height: 1; margin-right: 8px;
+}
+.ticketTitle {
+  font-size: 1.2rem; margin: 0;
+}
+.slaBadge {
+  color: var(--danger); font-weight: 600; font-size: 0.85rem;
+}
+.ticketMeta {
+  display: flex; gap: 16px; color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px;
+}
+.ticketDesc {
+  color: var(--text-secondary); line-height: 1.6;
+}
+.actionBar {
+  display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; align-items: center;
+}
+.actionError {
+  color: var(--danger); font-size: 0.85rem;
+}
+.commentCard {
+  margin-top: 16px;
+}
+.commentEmpty {
+  color: var(--text-secondary); font-size: 0.9rem;
+}
+.commentItem {
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.commentHeader {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 4px;
+}
+.commentAuthor {
+  font-size: 0.85rem;
+}
+.commentBadge {
+  font-size: 0.75rem; color: var(--warning); font-weight: 600;
+}
+.commentDate {
+  font-size: 0.75rem; color: var(--text-secondary);
+}
+.commentBody {
+  font-size: 0.9rem; color: var(--text-secondary);
+}
+.commentForm {
+  margin-top: 16px;
+}
+.assignLoading {
+  color: var(--text-secondary); font-size: 0.9rem;
+}

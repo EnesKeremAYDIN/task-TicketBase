@@ -12,7 +12,7 @@ export function getToken(): string | null {
   return authToken;
 }
 
-async function request(path: string, options: RequestInit = {}) {
+async function request<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...((options.headers as Record<string, string>) || {}),
@@ -39,8 +39,36 @@ async function request(path: string, options: RequestInit = {}) {
   return body;
 }
 
+interface LoginResponse {
+  token: string;
+  user: { id: string; name: string; email: string; role: string; tenant: { id: string; slug: string; name: string } };
+}
+
+interface TicketResponse {
+  tickets: import('./types').Ticket[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+interface DashboardStats {
+  statusBreakdown: Record<string, number>;
+  priorityBreakdown: Record<string, number>;
+  slaBreached: number;
+  agentWorkload: Record<string, number>;
+}
+
+interface RuleItem {
+  kural: string;
+  deger: string;
+}
+
+interface RulesResponse {
+  rules: RuleItem[];
+}
+
 export async function login(email: string, password: string) {
-  const data = await request('/auth/login', {
+  const data = await request<LoginResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
@@ -50,52 +78,52 @@ export async function login(email: string, password: string) {
 
 export async function listTickets(params: Record<string, string> = {}) {
   const qs = new URLSearchParams(params).toString();
-  return request(`/tickets${qs ? `?${qs}` : ''}`);
+  return request<TicketResponse>(`/tickets${qs ? `?${qs}` : ''}`);
 }
 
 export async function getTicket(id: string) {
-  return request(`/tickets/${id}`);
+  return request<import('./types').Ticket & { comments?: import('./types').Comment[] }>(`/tickets/${id}`);
 }
 
 export async function createTicket(data: { title: string; description: string; priority?: string }) {
-  return request('/tickets', { method: 'POST', body: JSON.stringify(data) });
+  return request<import('./types').Ticket>('/tickets', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function updateTicketStatus(id: string, status: string) {
-  return request(`/tickets/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  return request<import('./types').Ticket>(`/tickets/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
 }
 
 export async function claimTicket(id: string) {
-  return request(`/tickets/${id}/claim`, { method: 'POST' });
+  return request<import('./types').Ticket>(`/tickets/${id}/claim`, { method: 'POST' });
 }
 
 export async function assignTicket(id: string, agentId: string) {
-  return request(`/tickets/${id}/assign`, { method: 'POST', body: JSON.stringify({ agentId }) });
+  return request<import('./types').Ticket>(`/tickets/${id}/assign`, { method: 'POST', body: JSON.stringify({ agentId }) });
 }
 
 export async function getComments(ticketId: string) {
-  return request(`/tickets/${ticketId}/comments`);
+  return request<import('./types').Comment[]>(`/tickets/${ticketId}/comments`);
 }
 
 export async function createComment(ticketId: string, type: string, body: string) {
-  return request(`/tickets/${ticketId}/comments`, {
+  return request<import('./types').Comment>(`/tickets/${ticketId}/comments`, {
     method: 'POST',
     body: JSON.stringify({ type, body }),
   });
 }
 
 export async function getDashboard() {
-  return request('/sla/dashboard');
+  return request<DashboardStats>('/sla/dashboard');
 }
 
 export async function getSlaBreaches(page = 1) {
-  return request(`/sla/breaches?page=${page}&limit=20`);
+  return request<{ tickets: import('./types').Ticket[]; total: number }>(`/sla/breaches?page=${page}&limit=20`);
 }
 
 export async function getRules() {
-  return request('/rules');
+  return request<RulesResponse>('/rules');
 }
 
 export async function getAgents() {
-  return request('/agents');
+  return request<import('./types').Agent[]>('/agents');
 }

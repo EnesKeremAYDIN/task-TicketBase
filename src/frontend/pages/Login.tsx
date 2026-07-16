@@ -4,6 +4,7 @@ import { login } from '../lib/api';
 import Button from '../components/Button/Button';
 import Input from '../components/Input/Input';
 import Card from '../components/Card/Card';
+import styles from './Login.module.css';
 
 function Login() {
   const navigate = useNavigate();
@@ -28,15 +29,15 @@ function Login() {
   }
 
   return (
-    <div style={{ maxWidth: 400, margin: '80px auto' }}>
+    <div className={styles.wrapper}>
       <Card>
-        <h1 style={{ fontSize: '1.5rem', marginBottom: 4, color: 'var(--deep-space-blue)' }}>TicketBase</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 20 }}>Multi-Tenant IT Destek Sistemi</p>
-        {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: 12 }}>{error}</p>}
+        <h1 className={styles.title}>TicketBase</h1>
+        <p className={styles.subtitle}>Multi-Tenant IT Destek Sistemi</p>
+        {error && <p className={styles.error}>{error}</p>}
         <form onSubmit={handleSubmit}>
           <Input label="E-posta" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <Input label="Şifre" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <Button type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }}>Giriş Yap</Button>
+          <Button type="submit" loading={loading} className={styles.submitBtn}>Giriş Yap</Button>
         </form>
       </Card>
     </div>

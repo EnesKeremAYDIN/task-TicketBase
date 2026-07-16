@@ -6,7 +6,7 @@ import { createComment, getTicketComments } from '../services/comment';
 
 const createCommentSchema = z.object({
   type: z.enum(['public_reply', 'internal_note'], { message: 'Geçersiz yorum türü' }),
-  body: z.string().min(1, 'Yorum içeriği zorunludur'),
+  body: z.string().min(1, 'Yorum içeriği zorunludur').max(10000),
 });
 
 export async function commentRoutes(app: FastifyInstance): Promise<void> {

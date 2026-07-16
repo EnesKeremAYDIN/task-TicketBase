@@ -33,7 +33,7 @@ function Layout() {
     <div>
       <nav className={styles.nav}>
         <span className={styles.brand}>TicketBase</span>
-        <Link to="/tickets" className={`${styles.link} ${isActive('/tickets')}`}>Ticketlar</Link>
+        <Link to="/tickets" className={`${styles.link} ${isActive('/tickets')}`}>Ticketler</Link>
         <div className={styles.spacer} />
         <span className={styles.userInfo}>{user.name}</span>
         <Button variant="ghost" size="sm" onClick={handleLogout}>Çıkış</Button>

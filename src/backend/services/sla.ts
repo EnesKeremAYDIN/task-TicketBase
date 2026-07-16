@@ -3,6 +3,8 @@ import { addBusinessMinutes } from '../lib/business-hours';
 
 const BUSINESS_HOURS_PER_DAY = 9;
 
+const BREACH_BATCH_SIZE = 1000;
+
 export async function calculateSLADeadlines(ticketId: string, tenantId: string): Promise<void> {
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -59,16 +61,19 @@ export async function markBreachedTickets(tenantId?: string): Promise<number> {
     }),
   ]);
 
-  const allBreached = [...new Set([...resBreached, ...firstResBreached].map((t) => t.id))];
+  const breachedIds = [...new Set([...resBreached, ...firstResBreached].map((t) => t.id))];
 
-  if (allBreached.length === 0) return 0;
+  if (breachedIds.length === 0) return 0;
 
-  await prisma.ticket.updateMany({
-    where: { id: { in: allBreached } },
-    data: { slaBreached: true },
-  });
+  for (let i = 0; i < breachedIds.length; i += BREACH_BATCH_SIZE) {
+    const batch = breachedIds.slice(i, i + BREACH_BATCH_SIZE);
+    await prisma.ticket.updateMany({
+      where: { id: { in: batch } },
+      data: { slaBreached: true },
+    });
+  }
 
-  return allBreached.length;
+  return breachedIds.length;
 }
 
 export async function getSlaBreachList(tenantId: string, page = 1, limit = 20) {

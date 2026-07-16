@@ -1,18 +1,25 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { processInboundEmail } from '../services/inbound-email';
-import { ValidationError } from '../lib/errors';
+import { ValidationError, ForbiddenError } from '../lib/errors';
+
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'ticketbase-webhook-secret';
 
 const inboundSchema = z.object({
-  messageId: z.string().min(1, 'messageId zorunludur'),
-  tenant: z.string().min(1, 'Tenant zorunludur'),
-  from: z.string().email('Geçerli bir e-posta adresi giriniz'),
+  messageId: z.string().min(1),
+  tenant: z.string().min(1),
+  from: z.string().email(),
   subject: z.string().optional(),
-  body: z.string().min(1, 'Mesaj içeriği zorunludur'),
+  body: z.string().min(1).max(50000),
 });
 
 export async function inboundEmailRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/webhook/inbound-email', async (request, _reply) => {
+    const secret = request.headers['x-webhook-secret'];
+    if (secret !== WEBHOOK_SECRET) {
+      throw new ForbiddenError('Geçersiz webhook secret');
+    }
+
     const parsed = inboundSchema.safeParse(request.body);
 
     if (!parsed.success) {

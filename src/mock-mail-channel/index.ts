@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 const app = Fastify({ logger: true });
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'ticketbase-webhook-secret';
 
 app.post('/simulate', async (request, reply) => {
   const { tenant, from, subject, body } = request.body as Record<string, string | undefined>;
@@ -24,7 +25,7 @@ app.post('/simulate', async (request, reply) => {
   try {
     const response = await fetch(`${BACKEND_URL}/api/webhook/inbound-email`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-webhook-secret': WEBHOOK_SECRET },
       body: JSON.stringify(payload),
     });
 

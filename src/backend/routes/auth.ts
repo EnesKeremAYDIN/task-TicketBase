@@ -27,6 +27,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       id: user.id,
       tenantId: user.tenantId,
       role: user.role,
+      tenantSlug: user.tenant.slug,
     });
 
     return {

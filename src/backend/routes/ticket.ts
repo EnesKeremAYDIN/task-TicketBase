@@ -10,11 +10,10 @@ import {
   claimTicket,
   assignTicket,
 } from '../services/ticket';
-import prisma from '../lib/prisma';
 
 const createTicketSchema = z.object({
-  title: z.string().min(1, 'Başlık zorunludur').max(200),
-  description: z.string().min(1, 'Açıklama zorunludur'),
+  title: z.string().min(1, 'Başlık zorunludur').max(500),
+  description: z.string().min(1, 'Açıklama zorunludur').max(10000),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
   category: z.string().max(100).optional(),
 });
@@ -36,12 +35,7 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
       throw new ValidationError(parsed.error.errors[0].message);
     }
 
-    const tenant = await prisma.tenant.findFirst({
-      where: { id: user.tenantId },
-      select: { slug: true },
-    });
-
-    const ticket = await createTicket(parsed.data, user.id, user.tenantId, tenant?.slug || '');
+    const ticket = await createTicket(parsed.data, user.id, user.tenantId, (user as { tenantSlug?: string }).tenantSlug || '');
     return reply.status(201).send(ticket);
   });
 

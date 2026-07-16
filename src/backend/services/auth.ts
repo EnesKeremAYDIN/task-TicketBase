@@ -5,7 +5,7 @@ import { AuthError } from '../lib/errors';
 const DUMMY_HASH = '$2a$10$' + 'x'.repeat(53);
 
 export async function loginUser(email: string, password: string) {
-  const user = await prisma.user.findFirst({
+  const user = await prisma.user.findUnique({
     where: { email },
     include: { tenant: true },
   });

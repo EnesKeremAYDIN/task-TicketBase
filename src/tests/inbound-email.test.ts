@@ -9,7 +9,10 @@ import { ticketRoutes } from '../backend/routes/ticket';
 import { inboundEmailRoutes } from '../backend/routes/inbound-email';
 import { AppError } from '../backend/lib/errors';
 
+const TEST_WEBHOOK_SECRET = 'ticketbase-webhook-secret';
+
 async function buildApp() {
+  process.env.WEBHOOK_SECRET = TEST_WEBHOOK_SECRET;
   const app = Fastify({ logger: false });
 
   app.setErrorHandler((error, _request, reply) => {
@@ -67,10 +70,15 @@ describe('Inbound Email - POST /api/webhook/inbound-email', () => {
     await app.close();
   });
 
+  function webhookHeaders() {
+    return { 'x-webhook-secret': TEST_WEBHOOK_SECRET };
+  }
+
   it('geçerli e-posta ile yeni ticket oluşturulmalı', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/webhook/inbound-email',
+      headers: webhookHeaders(),
       payload: {
         messageId: crypto.randomUUID(),
         tenant: 'acme',
@@ -98,6 +106,7 @@ describe('Inbound Email - POST /api/webhook/inbound-email', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/webhook/inbound-email',
+      headers: webhookHeaders(),
       payload: {
         messageId: crypto.randomUUID(),
         tenant: 'acme',
@@ -120,6 +129,7 @@ describe('Inbound Email - POST /api/webhook/inbound-email', () => {
     await app.inject({
       method: 'POST',
       url: '/api/webhook/inbound-email',
+      headers: webhookHeaders(),
       payload: {
         messageId,
         tenant: 'acme',
@@ -132,6 +142,7 @@ describe('Inbound Email - POST /api/webhook/inbound-email', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/webhook/inbound-email',
+      headers: webhookHeaders(),
       payload: {
         messageId,
         tenant: 'acme',
@@ -150,6 +161,7 @@ describe('Inbound Email - POST /api/webhook/inbound-email', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/webhook/inbound-email',
+      headers: webhookHeaders(),
       payload: {
         messageId: crypto.randomUUID(),
         tenant: 'olmayan-tenant',
@@ -166,6 +178,7 @@ describe('Inbound Email - POST /api/webhook/inbound-email', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/webhook/inbound-email',
+      headers: webhookHeaders(),
       payload: {
         messageId: crypto.randomUUID(),
         tenant: 'acme',
@@ -182,6 +195,7 @@ describe('Inbound Email - POST /api/webhook/inbound-email', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/webhook/inbound-email',
+      headers: webhookHeaders(),
       payload: {
         messageId: crypto.randomUUID(),
         tenant: 'acme',
@@ -196,6 +210,7 @@ describe('Inbound Email - POST /api/webhook/inbound-email', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/webhook/inbound-email',
+      headers: webhookHeaders(),
       payload: {
         messageId: crypto.randomUUID(),
         tenant: 'acme',
@@ -210,19 +225,22 @@ describe('Inbound Email - POST /api/webhook/inbound-email', () => {
     expect(body.message).toContain('Gönderen kullanıcı bulunamadı');
   });
 
-  it('webhook endpoint public olmalı (token gerekmez)', async () => {
+  it('yanlış webhook secret ile 403 dönmeli', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/webhook/inbound-email',
+      headers: { 'x-webhook-secret': 'wrong-secret' },
       payload: {
         messageId: crypto.randomUUID(),
         tenant: 'acme',
         from: 'musteri1@acme.com',
-        subject: 'Public test',
-        body: 'Token gerekmemeli',
+        subject: 'Auth test',
+        body: 'Yetkisiz erişim',
       },
     });
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(403);
+    const body = JSON.parse(response.body);
+    expect(body.message).toContain('webhook secret');
   });
 });

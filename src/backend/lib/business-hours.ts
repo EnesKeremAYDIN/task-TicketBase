@@ -21,7 +21,7 @@ function isBusinessDay(date: Date, holidays: Date[]): boolean {
 }
 
 function istHour(date: Date): number {
-  return date.getUTCHours() + TZ_OFFSET;
+  return (date.getUTCHours() + TZ_OFFSET) % 24;
 }
 
 function isWithinHours(date: Date): boolean {
@@ -31,8 +31,11 @@ function isWithinHours(date: Date): boolean {
 
 export function nextBusinessMinute(date: Date, holidays: Date[]): Date {
   let current = new Date(date);
+  let iterations = 0;
+  const MAX_ITERATIONS = 1000;
 
-  while (true) {
+  while (iterations < MAX_ITERATIONS) {
+    iterations++;
     if (!isBusinessDay(current, holidays)) {
       current = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate() + 1, WORK_START_H, 0, 0, 0));
       continue;
@@ -51,9 +54,12 @@ export function nextBusinessMinute(date: Date, holidays: Date[]): Date {
 
     return current;
   }
+
+  throw new Error('nextBusinessMinute: maximum iterations exceeded');
 }
 
 export function addBusinessMinutes(start: Date, minutes: number, holidays: Date[]): Date {
+  if (minutes < 0) throw new Error('Minutes cannot be negative');
   let remaining = minutes;
   let current = nextBusinessMinute(start, holidays);
 

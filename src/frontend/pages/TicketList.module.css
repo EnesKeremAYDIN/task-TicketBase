@@ -1,0 +1,64 @@
+.dashboardGrid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 20px;
+}
+.statRow {
+  display: flex; justify-content: space-between; padding: 2px 0; font-size: 0.85rem;
+}
+.slaCount {
+  font-size: 1.8rem; font-weight: 700; margin: 0;
+}
+.slaText {
+  color: var(--text-secondary); font-size: 0.85rem;
+}
+.headerRow {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+}
+.headerTitle {
+  font-size: 1.3rem;
+}
+.createCard {
+  margin-bottom: 16px;
+}
+.filterRow {
+  display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap;
+}
+.filterSelect {
+  width: 160px;
+}
+.filterSelectWide {
+  width: 180px;
+}
+.searchGroup {
+  display: flex; gap: 4px; align-items: center; flex: 1; min-width: 200px;
+}
+.searchInput {
+  flex: 1;
+}
+.tableCard {
+  /* uses Card styles */
+}
+.table {
+  width: 100%; border-collapse: collapse;
+}
+.clickableRow {
+  cursor: pointer;
+}
+.cellTitle {
+  font-weight: 500;
+}
+.cellLastComment {
+  font-size: 0.8rem; color: var(--text-secondary); max-width: 150px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.errorText {
+  color: var(--danger); font-size: 0.85rem;
+}
+.customerMsg {
+  /* Card içinde p için */
+}
+.rulesCard {
+  margin-top: 24px;
+}
+.rulesTable {
+  width: 100%; border-collapse: collapse;
+}

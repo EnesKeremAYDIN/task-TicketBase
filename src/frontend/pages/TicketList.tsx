@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listTickets, createTicket, claimTicket, getDashboard, getRules, getAgents } from '../lib/api';
 import type { Ticket, Priority, Agent } from '../lib/types';
@@ -12,6 +12,7 @@ import Select from '../components/Select/Select';
 import Textarea from '../components/Textarea/Textarea';
 import Loading from '../components/Loading/Loading';
 import EmptyState from '../components/EmptyState/EmptyState';
+import styles from './TicketList.module.css';
 
 interface DashboardStats {
   statusBreakdown: Record<string, number>;
@@ -42,15 +43,22 @@ function TicketList() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [agentOptions, setAgentOptions] = useState<{ value: string; label: string }[]>([]);
   const [agentMap, setAgentMap] = useState<Record<string, string>>({});
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const isAgent = user.role === 'agent' || user.role === 'admin';
+  let user = {};
+  try {
+    const raw = localStorage.getItem('user');
+    if (raw) user = JSON.parse(raw);
+  } catch {
+    user = {};
+  }
+
+  const isAgent = (user as { role?: string }).role === 'agent' || (user as { role?: string }).role === 'admin';
 
   const statusLabels: Record<string, string> = {
     new: 'Yeni', open: 'Açık', pending: 'Beklemede', resolved: 'Çözüldü', closed: 'Kapalı',
   };
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!isAgent) return;
     setLoading(true);
     try {
@@ -68,32 +76,29 @@ function TicketList() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [page, limit, statusFilter, priorityFilter, agentFilter, search, isAgent]);
 
   useEffect(() => {
     if (isAgent) {
-      Promise.all([getDashboard(), getRules(), getAgents()]).then(([s, r, agents]) => {
-        setStats(s as DashboardStats);
-        setRules((r as { rules: Rule[] }).rules);
-        const agentList = agents as Agent[];
-        setAgentOptions([
-          { value: '', label: 'Tümü' },
-          { value: 'unassigned', label: 'Atanmamış' },
-          ...agentList.map((a) => ({ value: a.id, label: a.name })),
-        ]);
-        setAgentMap(Object.fromEntries(agentList.map((a) => [a.id, a.name])));
-      });
+      Promise.all([getDashboard(), getRules(), getAgents()])
+        .then(([s, r, agents]) => {
+          setStats(s as DashboardStats);
+          setRules((r as { rules: Rule[] }).rules);
+          const agentList = agents as Agent[];
+          setAgentOptions([
+            { value: '', label: 'Tümü' },
+            { value: 'unassigned', label: 'Atanmamış' },
+            ...agentList.map((a) => ({ value: a.id, label: a.name })),
+          ]);
+          setAgentMap(Object.fromEntries(agentList.map((a) => [a.id, a.name])));
+        })
+        .catch(() => {});
     }
     load();
-  }, []);
-
-  useEffect(() => {
-    if (isAgent) load();
-  }, [page, limit]);
+  }, [load, isAgent]);
 
   function handleSearch() {
     setPage(1);
-    load();
   }
 
   function handleFilterChange() {
@@ -109,7 +114,7 @@ function TicketList() {
       setNewDesc('');
       setNewPrio('normal');
       load();
-      if (isAgent) getDashboard().then((s) => setStats(s as DashboardStats));
+      if (isAgent) getDashboard().then((s) => setStats(s as DashboardStats)).catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Hata');
     }
@@ -118,7 +123,18 @@ function TicketList() {
   async function handleClaim(id: string) {
     await claimTicket(id);
     load();
-    if (isAgent) getDashboard().then((s) => setStats(s as DashboardStats));
+    if (isAgent) getDashboard().then((s) => setStats(s as DashboardStats)).catch(() => {});
+  }
+
+  function handleRowClick(ticketId: string) {
+    navigate(`/tickets/${ticketId}`);
+  }
+
+  function handleRowKeyDown(e: React.KeyboardEvent, ticketId: string) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      navigate(`/tickets/${ticketId}`);
+    }
   }
 
   const statusOptions = [
@@ -141,10 +157,10 @@ function TicketList() {
   return (
     <div>
       {isAgent && stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 20 }}>
+        <div className={styles.dashboardGrid}>
           <Card title="Durum Dağılımı">
             {(['new', 'open', 'pending', 'resolved', 'closed'] as const).map((k) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '0.85rem' }}>
+              <div key={k} className={styles.statRow}>
                 <span>{statusLabels[k]}</span>
                 <strong>{stats.statusBreakdown[k] || 0}</strong>
               </div>
@@ -152,24 +168,24 @@ function TicketList() {
           </Card>
           <Card title="Öncelik Dağılımı">
             {(['urgent', 'high', 'normal', 'low'] as const).map((k) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '0.85rem' }}>
+              <div key={k} className={styles.statRow}>
                 <PriorityBadge priority={k} />
                 <strong>{stats.priorityBreakdown[k] || 0}</strong>
               </div>
             ))}
           </Card>
           <Card title="SLA İhlalleri">
-            <p style={{ fontSize: '1.8rem', fontWeight: 700, color: stats.slaBreached > 0 ? 'var(--danger)' : 'var(--success)', margin: 0 }}>
+            <p className={styles.slaCount} style={{ color: stats.slaBreached > 0 ? 'var(--danger)' : 'var(--success)' }}>
               {stats.slaBreached}
             </p>
-            {stats.slaBreached > 0 && <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Ticket SLA süresini aştı</p>}
+            {stats.slaBreached > 0 && <p className={styles.slaText}>Ticket SLA süresini aştı</p>}
           </Card>
           <Card title="Ajan İş Yükü">
             {Object.entries(stats.agentWorkload).length === 0 ? (
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Ajan bulunamadı</p>
+              <p className={styles.slaText}>Ajan bulunamadı</p>
             ) : (
               Object.entries(stats.agentWorkload).map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '0.85rem' }}>
+                <div key={k} className={styles.statRow}>
                   <span>{agentMap[k] || 'Bilinmeyen Ajan'}</span>
                   <strong>{v} ticket</strong>
                 </div>
@@ -179,9 +195,9 @@ function TicketList() {
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ fontSize: '1.3rem' }}>Ticket Listesi</h2>
-        {user.role === 'customer' && (
+      <div className={styles.headerRow}>
+        <h2 className={styles.headerTitle}>Ticket Listesi</h2>
+        {(user as { role?: string }).role === 'customer' && (
           <Button onClick={() => setShowCreate(!showCreate)} variant={showCreate ? 'secondary' : 'primary'}>
             {showCreate ? 'İptal' : 'Yeni Ticket'}
           </Button>
@@ -189,7 +205,7 @@ function TicketList() {
       </div>
 
       {showCreate && (
-        <Card style={{ marginBottom: 16 }}>
+        <Card className={styles.createCard}>
           <form onSubmit={handleCreate}>
             <Input label="Başlık" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} required />
             <Textarea label="Açıklama" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} required />
@@ -197,25 +213,25 @@ function TicketList() {
               { value: 'low', label: 'Düşük' }, { value: 'normal', label: 'Normal' },
               { value: 'high', label: 'Yüksek' }, { value: 'urgent', label: 'Acil' },
             ]} />
-            {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
+            {error && <p className={styles.errorText}>{error}</p>}
             <Button type="submit" style={{ marginTop: 8 }}>Oluştur</Button>
           </form>
         </Card>
       )}
 
       {isAgent && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ width: 160 }}>
+        <div className={styles.filterRow}>
+          <div className={styles.filterSelect}>
             <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); handleFilterChange(); }} options={statusOptions} />
           </div>
-          <div style={{ width: 160 }}>
+          <div className={styles.filterSelect}>
             <Select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); handleFilterChange(); }} options={priorityOptions} />
           </div>
-          <div style={{ width: 180 }}>
+          <div className={styles.filterSelectWide}>
             <Select value={agentFilter} onChange={(e) => { setAgentFilter(e.target.value); handleFilterChange(); }} options={agentOptions} />
           </div>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: 1, minWidth: 200 }}>
-            <div style={{ flex: 1 }}>
+          <div className={styles.searchGroup}>
+            <div className={styles.searchInput}>
               <Input placeholder="Ara..." value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
             </div>
             <Button variant="secondary" size="sm" onClick={handleSearch}>Ara</Button>
@@ -233,7 +249,7 @@ function TicketList() {
         <EmptyState title="Ticket bulunamadı" description="Filtreleri değiştirmeyi deneyin." />
       ) : (
         <Card>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className={styles.table}>
             <thead>
               <tr>
                 <th>No</th><th>Başlık</th><th>Durum</th><th>Öncelik</th><th>Müşteri</th><th>Ajan</th><th>Son Yorum</th><th></th>
@@ -241,18 +257,26 @@ function TicketList() {
             </thead>
             <tbody>
               {tickets.map((t) => (
-                <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/tickets/${t.id}`)}>
+                <tr
+                  key={t.id}
+                  className={styles.clickableRow}
+                  onClick={() => handleRowClick(t.id)}
+                  onKeyDown={(e) => handleRowKeyDown(e, t.id)}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Ticket ${t.displayId}: ${t.title}`}
+                >
                   <td>{t.displayId}</td>
-                  <td style={{ fontWeight: 500 }}>{t.title}</td>
+                  <td className={styles.cellTitle}>{t.title}</td>
                   <td><StatusBadge status={t.status} /></td>
                   <td><PriorityBadge priority={t.priority} /></td>
                   <td>{t.customer?.name}</td>
                   <td>{t.assignedTo?.name || '-'}</td>
-                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td className={styles.cellLastComment}>
                     {t.lastComment ? `${t.lastComment.author.name}: ${t.lastComment.body}` : '-'}
                   </td>
                   <td>
-                    {user.role === 'agent' && !t.assignedTo && t.status !== 'closed' && (
+                    {(user as { role?: string }).role === 'agent' && !t.assignedTo && t.status !== 'closed' && (
                       <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handleClaim(t.id); }}>Üstlen</Button>
                     )}
                   </td>
@@ -265,9 +289,9 @@ function TicketList() {
 
       {isAgent && <Pagination page={page} total={total} limit={limit} onChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} />}
 
-      {isAgent && rules.length > 0 && user.role === 'admin' && (
+      {isAgent && rules.length > 0 && (user as { role?: string }).role === 'admin' && (
         <Card title="İşletim Kuralları" style={{ marginTop: 24 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className={styles.rulesTable}>
             <thead>
               <tr>
                 <th>Kural</th>

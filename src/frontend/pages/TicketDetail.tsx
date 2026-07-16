@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getTicket, updateTicketStatus, claimTicket, assignTicket, getComments, createComment } from '../lib/api';
 import { getAgents } from '../lib/api';
@@ -11,6 +11,7 @@ import Textarea from '../components/Textarea/Textarea';
 import Select from '../components/Select/Select';
 import Modal from '../components/Modal/Modal';
 import Loading from '../components/Loading/Loading';
+import styles from './TicketDetail.module.css';
 
 function TicketDetail() {
   const { id } = useParams<{ id: string }>();
@@ -25,10 +26,18 @@ function TicketDetail() {
   const [selectedAgent, setSelectedAgent] = useState('');
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const isAgent = user.role === 'agent' || user.role === 'admin';
 
-  async function load() {
+  let user = {};
+  try {
+    const raw = localStorage.getItem('user');
+    if (raw) user = JSON.parse(raw);
+  } catch {
+    user = {};
+  }
+  const isAgent = (user as { role?: string }).role === 'agent' || (user as { role?: string }).role === 'admin';
+  const isAdmin = (user as { role?: string }).role === 'admin';
+
+  const load = useCallback(async () => {
     if (!id) return;
     setError('');
     try {
@@ -39,22 +48,25 @@ function TicketDetail() {
       setError(err instanceof Error ? err.message : 'Ticket yüklenirken hata oluştu');
       setTicket(null);
     }
-  }
+  }, [id]);
 
   useEffect(() => {
     load();
-    if (user.role === 'admin') {
+  }, [load]);
+
+  useEffect(() => {
+    if (isAdmin) {
       setAgentsLoading(true);
-      getAgents().then(setAgents).finally(() => setAgentsLoading(false));
+      getAgents().then(setAgents).catch(() => {}).finally(() => setAgentsLoading(false));
     }
-  }, [id]);
+  }, [isAdmin]);
 
   if (error) {
     return (
       <div>
         <Card>
-          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-            <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: 16 }}>{error}</p>
+          <div className={styles.errorCard}>
+            <p className={styles.errorMsg}>{error}</p>
             <Button onClick={() => navigate('/tickets')}>&larr; Ticket Listesine Dön</Button>
           </div>
         </Card>
@@ -121,45 +133,45 @@ function TicketDetail() {
   return (
     <div>
       <Card>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/tickets')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-secondary)', padding: 0, lineHeight: 1, marginRight: 8 }} title="Geri">&larr;</button>
-          <h2 style={{ fontSize: '1.2rem', margin: 0 }}>{ticket.displayId}: {ticket.title}</h2>
+        <div className={styles.ticketHeader}>
+          <button onClick={() => navigate('/tickets')} className={styles.backBtn} title="Geri" aria-label="Geri">&larr;</button>
+          <h2 className={styles.ticketTitle}>{ticket.displayId}: {ticket.title}</h2>
           <StatusBadge status={ticket.status} />
           <PriorityBadge priority={ticket.priority} />
-          {ticket.slaBreached && <span style={{ color: 'var(--danger)', fontWeight: 600, fontSize: '0.85rem' }}>SLA İhlali</span>}
+          {ticket.slaBreached && <span className={styles.slaBadge}>SLA İhlali</span>}
         </div>
 
-        <div style={{ display: 'flex', gap: 16, color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 12 }}>
+        <div className={styles.ticketMeta}>
           <span>Müşteri: <strong>{ticket.customer?.name}</strong></span>
           <span>Ajan: <strong>{ticket.assignedTo?.name || 'Atanmamış'}</strong></span>
           <span>Oluşturma: <strong>{new Date(ticket.createdAt).toLocaleDateString('tr-TR')}</strong></span>
         </div>
 
-        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>{ticket.description}</p>
+        <p className={styles.ticketDesc}>{ticket.description}</p>
       </Card>
 
       {isAgent && (
-        <div style={{ display: 'flex', gap: 8, margin: '12px 0', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className={styles.actionBar}>
           {statusActions[ticket.status]?.map((s) => (
             <Button key={s} size="sm" onClick={() => handleStatus(s)}>
               {s === 'open' ? 'Aç' : s === 'pending' ? 'Beklemeye Al' : s === 'resolved' ? 'Çözüldü' : s === 'closed' ? 'Kapat' : s}
             </Button>
           ))}
-          {!ticket.assignedTo && user.role === 'agent' && (
+          {!ticket.assignedTo && (user as { role?: string }).role === 'agent' && (
             <Button variant="secondary" size="sm" onClick={handleClaim}>Üstlen</Button>
           )}
-          {user.role === 'admin' && (
+          {isAdmin && (
             <Button variant="secondary" size="sm" onClick={() => setShowAssign(true)}>
               {ticket.assignedTo ? 'Ajan Değiştir' : 'Ajan Ata'}
             </Button>
           )}
-          {actionError && <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{actionError}</span>}
+          {actionError && <span className={styles.actionError}>{actionError}</span>}
         </div>
       )}
 
       <Modal open={showAssign} onClose={() => setShowAssign(false)} title="Ajan Ata">
         {agentsLoading ? (
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Ajanlar yükleniyor...</p>
+          <p className={styles.assignLoading}>Ajanlar yükleniyor...</p>
         ) : (
           <>
             <Select label="Ajan Seç" value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)} options={agents.map((a) => ({ value: a.id, label: a.name }))} />
@@ -170,21 +182,21 @@ function TicketDetail() {
 
       <Card title="Yorumlar" style={{ marginTop: 16 }}>
         {comments.length === 0 ? (
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Henüz yorum yok.</p>
+          <p className={styles.commentEmpty}>Henüz yorum yok.</p>
         ) : (
           comments.map((c) => (
-            <div key={c.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
-                <strong style={{ fontSize: '0.85rem' }}>{c.author?.name}</strong>
-                {c.type === 'internal_note' && <span style={{ fontSize: '0.75rem', color: 'var(--warning)', fontWeight: 600 }}>İç Not</span>}
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(c.createdAt).toLocaleString('tr-TR')}</span>
+            <div key={c.id} className={styles.commentItem}>
+              <div className={styles.commentHeader}>
+                <strong className={styles.commentAuthor}>{c.author?.name}</strong>
+                {c.type === 'internal_note' && <span className={styles.commentBadge}>İç Not</span>}
+                <span className={styles.commentDate}>{new Date(c.createdAt).toLocaleString('tr-TR')}</span>
               </div>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{c.body}</p>
+              <p className={styles.commentBody}>{c.body}</p>
             </div>
           ))
         )}
 
-        <form onSubmit={handleComment} style={{ marginTop: 16 }}>
+        <form onSubmit={handleComment} className={styles.commentForm}>
           <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Yorumunuz..." required />
           {isAgent && (
             <Select value={commentType} onChange={(e) => setCommentType(e.target.value)} options={[
