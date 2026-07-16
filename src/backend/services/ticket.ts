@@ -2,6 +2,7 @@ import prisma from '../lib/prisma';
 import { NotFoundError, ValidationError } from '../lib/errors';
 import { validateTransition } from '../lib/state-machine';
 import { tenantFilter } from '../lib/tenant-context';
+import { calculateSLADeadlines } from './sla';
 
 interface CreateTicketData {
   title: string;
@@ -47,6 +48,8 @@ export async function createTicket(data: CreateTicketData, customerId: string, t
       },
     });
   });
+
+  await calculateSLADeadlines(ticket.id, tenantId);
 
   return ticket;
 }

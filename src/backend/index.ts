@@ -6,6 +6,8 @@ import { tenantMiddleware } from './middleware/tenant';
 import { authRoutes } from './routes/auth';
 import { ticketRoutes } from './routes/ticket';
 import { inboundEmailRoutes } from './routes/inbound-email';
+import { commentRoutes } from './routes/comment';
+import { slaRoutes } from './routes/sla';
 import { AppError } from './lib/errors';
 
 const app = Fastify({ logger: true });
@@ -37,6 +39,8 @@ const start = async () => {
   await app.register(authRoutes);
   await app.register(ticketRoutes);
   await app.register(inboundEmailRoutes);
+  await app.register(commentRoutes);
+  await app.register(slaRoutes);
 
   try {
     await app.listen({ port: Number(process.env.PORT) || 3000, host: '0.0.0.0' });
