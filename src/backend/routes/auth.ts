@@ -4,8 +4,8 @@ import { loginUser } from '../services/auth';
 import { ValidationError } from '../lib/errors';
 
 const loginSchema = z.object({
-  email: z.string().email('Geçerli bir e-posta girin'),
-  password: z.string().min(1, 'Şifre gereklidir'),
+  email: z.string().email('Geçerli bir e-posta adresi giriniz'),
+  password: z.string().min(1, 'Şifre zorunludur'),
 });
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {

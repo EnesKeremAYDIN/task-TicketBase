@@ -21,3 +21,7 @@ JWT auth için @fastify/jwt kullanıldı. Başlangıçta ayrı bir `authPlugin` 
 ## 2026-07-16 — JWT Token Süresi
 
 Spec'te JWT süresi belirtilmemişti. 7 gün olarak belirlendi — işe alım task'ı olduğu için sık token yenileme akışına gerek yok. (AI önerisi: 24 saat önerdi, kabul edilmedi — task sürecinde kullanım kolaylığı daha önemli.)
+
+## 2026-07-16 — Login Hata Mesajları ve Timing Attack Koruması
+
+Login hata mesajları daha doğal Türkçe olacak şekilde güncellendi: "Şifre gereklidir" → "Şifre zorunludur", "Geçerli bir e-posta girin" → "Geçerli bir e-posta adresi giriniz". Ayrıca account enumeration saldırılarına karşı timing attack koruması eklendi: kullanıcı var/yok fark etmeksizin bcrypt her durumda çalışacak şekilde dummy hash kullanıldı. (AI önerisi: bu düzeltmeyi AI önerdi — timing attack riskini ilk o fark etti, kabul edildi.)
