@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getDashboard, getSlaBreaches } from '../lib/api';
-import type { DashboardStats, Ticket } from '../lib/types';
+import { getDashboard, getSlaBreaches, getAgents } from '../lib/api';
+import type { DashboardStats, Ticket, Agent } from '../lib/types';
 import Card from '../components/Card/Card';
 import StatusBadge from '../components/StatusBadge/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge/PriorityBadge';
@@ -9,11 +9,13 @@ import Loading from '../components/Loading/Loading';
 function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [breaches, setBreaches] = useState<{ tickets: Ticket[] } | null>(null);
+  const [agentMap, setAgentMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    Promise.all([getDashboard(), getSlaBreaches()]).then(([s, b]) => {
+    Promise.all([getDashboard(), getSlaBreaches(), getAgents()]).then(([s, b, agents]) => {
       setStats(s);
       setBreaches(b);
+      setAgentMap(Object.fromEntries((agents as Agent[]).map((a) => [a.id, a.name])));
     });
   }, []);
 
@@ -57,7 +59,7 @@ function Dashboard() {
           ) : (
             Object.entries(stats.agentWorkload).map(([k, v]) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.9rem' }}>
-                <span>Ajan</span>
+                <span>{agentMap[k] || 'Bilinmeyen Ajan'}</span>
                 <strong>{v} ticket</strong>
               </div>
             ))

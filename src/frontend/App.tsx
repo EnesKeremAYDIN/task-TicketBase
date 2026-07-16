@@ -4,7 +4,7 @@ import TicketList from './pages/TicketList';
 import TicketDetail from './pages/TicketDetail';
 import Dashboard from './pages/Dashboard';
 import Rules from './pages/Rules';
-import Layout from './components/Layout';
+import Layout from './components/Layout/Layout';
 
 function App() {
   return (

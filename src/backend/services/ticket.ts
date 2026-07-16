@@ -111,13 +111,6 @@ export async function getTicketById(ticketId: string, tenantId: string, userId?:
     include: {
       customer: { select: { id: true, name: true, email: true } },
       assignedTo: { select: { id: true, name: true } },
-      comments: {
-        orderBy: { createdAt: 'asc' },
-        ...(userRole === 'customer' ? { where: { type: 'public_reply' } } : {}),
-        include: {
-          author: { select: { id: true, name: true, role: true } },
-        },
-      },
     },
   });
 
@@ -151,10 +144,6 @@ export async function updateTicketStatus(ticketId: string, tenantId: string, new
 
   if (newStatus === 'closed') {
     updateData.closedAt = new Date();
-  }
-
-  if (newStatus === 'open' && !ticket.firstResponseAt) {
-    updateData.firstResponseAt = new Date();
   }
 
   const updated = await prisma.ticket.update({

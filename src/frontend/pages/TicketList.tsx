@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listTickets, createTicket, claimTicket } from '../lib/api';
-import type { Ticket, Status, Priority } from '../lib/types';
+import type { Ticket, Priority } from '../lib/types';
 import Card from '../components/Card/Card';
 import StatusBadge from '../components/StatusBadge/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge/PriorityBadge';
