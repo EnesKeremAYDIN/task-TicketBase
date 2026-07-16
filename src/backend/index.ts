@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import fjwt from '@fastify/jwt';
+import rateLimit from '@fastify/rate-limit';
 import { authMiddleware } from './middleware/auth';
 import { tenantMiddleware } from './middleware/tenant';
 import { authRoutes } from './routes/auth';
@@ -36,6 +37,12 @@ const start = async () => {
   }
 
   await app.register(cors);
+
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+  });
+
   await app.register(fjwt, {
     secret: jwtSecret,
     sign: { expiresIn: '7d' },

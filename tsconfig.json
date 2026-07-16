@@ -22,6 +22,6 @@
       "@frontend/*": ["src/frontend/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "prisma/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/backend/**/*.ts", "src/mock-mail-channel/**/*.ts", "src/tests/**/*.ts", "prisma/**/*.ts"],
+  "exclude": ["node_modules", "dist", "src/frontend"]
 }
