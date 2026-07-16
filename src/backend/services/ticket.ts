@@ -22,31 +22,30 @@ interface ListTicketsParams {
 }
 
 export async function createTicket(data: CreateTicketData, customerId: string, tenantId: string, tenantSlug: string) {
-  const ticketNumber = await prisma.$transaction(async (tx) => {
+  const ticket = await prisma.$transaction(async (tx) => {
     const counter = await tx.ticketCounter.update({
       where: { tenantId },
       data: { lastNumber: { increment: 1 } },
     });
-    return counter.lastNumber;
-  });
 
-  const displayId = `${tenantSlug.toUpperCase()}-${ticketNumber}`;
+    const displayId = `${tenantSlug.toUpperCase()}-${counter.lastNumber}`;
 
-  const ticket = await prisma.ticket.create({
-    data: {
-      tenantId,
-      number: ticketNumber,
-      displayId,
-      title: data.title,
-      description: data.description,
-      status: 'new',
-      priority: data.priority || 'normal',
-      category: data.category || null,
-      customerId,
-    },
-    include: {
-      customer: { select: { id: true, name: true, email: true } },
-    },
+    return tx.ticket.create({
+      data: {
+        tenantId,
+        number: counter.lastNumber,
+        displayId,
+        title: data.title,
+        description: data.description,
+        status: 'new',
+        priority: data.priority || 'normal',
+        category: data.category || null,
+        customerId,
+      },
+      include: {
+        customer: { select: { id: true, name: true, email: true } },
+      },
+    });
   });
 
   return ticket;

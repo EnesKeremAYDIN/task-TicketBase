@@ -1,6 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-
-const PUBLIC_ROUTES = ['/api/auth/login'];
+import { PUBLIC_ROUTES } from '../lib/constants';
 
 export async function tenantMiddleware(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   if (PUBLIC_ROUTES.includes(request.url)) {
@@ -10,6 +9,6 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
   const user = request.user as { tenantId?: string } | undefined;
 
   if (!user?.tenantId) {
-    reply.status(401).send({ message: 'Oturum bulunamadı' });
+    return reply.status(401).send({ message: 'Oturum bulunamadı' });
   }
 }
