@@ -1,0 +1,5 @@
+.table { width: 100%; border-collapse: collapse; }
+.th { text-align: left; padding: 8px 12px; font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+.td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.tr:hover { background: var(--gray-100); }
+.clickable { cursor: pointer; }

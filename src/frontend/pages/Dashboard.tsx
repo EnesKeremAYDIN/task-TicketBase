@@ -1,78 +1,90 @@
 import { useState, useEffect } from 'react';
 import { getDashboard, getSlaBreaches } from '../lib/api';
+import type { DashboardStats, Ticket } from '../lib/types';
+import Card from '../components/Card/Card';
+import StatusBadge from '../components/StatusBadge/StatusBadge';
+import PriorityBadge from '../components/PriorityBadge/PriorityBadge';
+import Loading from '../components/Loading/Loading';
 
 function Dashboard() {
-  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
-  const [breaches, setBreaches] = useState<Record<string, unknown> | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [breaches, setBreaches] = useState<{ tickets: Ticket[] } | null>(null);
 
   useEffect(() => {
-    getDashboard().then(setStats);
-    getSlaBreaches().then(setBreaches);
+    Promise.all([getDashboard(), getSlaBreaches()]).then(([s, b]) => {
+      setStats(s);
+      setBreaches(b);
+    });
   }, []);
 
-  if (!stats) return <div>Yükleniyor...</div>;
+  if (!stats) return <Loading />;
+
+  const statusLabels: Record<string, string> = { new: 'Yeni', open: 'Açık', pending: 'Beklemede', resolved: 'Çözüldü', closed: 'Kapalı' };
 
   return (
     <div>
-      <h2>Dashboard</h2>
+      <h2 style={{ fontSize: '1.3rem', marginBottom: 16 }}>Dashboard</h2>
 
-      <div style={{ display: 'flex', gap: 24 }}>
-        <div style={{ flex: 1 }}>
-          <h3>Durum Dağılımı</h3>
-          <ul>
-            {Object.entries(stats.statusBreakdown).map(([k, v]) => (
-              <li key={k}>{k}: {String(v)}</li>
-            ))}
-          </ul>
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 24 }}>
+        <Card title="Durum Dağılımı">
+          {Object.entries(stats.statusBreakdown).map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.9rem' }}>
+              <span>{statusLabels[k] || k}</span>
+              <strong>{v}</strong>
+            </div>
+          ))}
+        </Card>
 
-        <div style={{ flex: 1 }}>
-          <h3>Öncelik Dağılımı</h3>
-          <ul>
-            {Object.entries(stats.priorityBreakdown).map(([k, v]) => (
-              <li key={k}>{k}: {String(v)}</li>
-            ))}
-          </ul>
-        </div>
+        <Card title="Öncelik Dağılımı">
+          {Object.entries(stats.priorityBreakdown).map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.9rem' }}>
+              <span><PriorityBadge priority={k as 'low' | 'normal' | 'high' | 'urgent'} /></span>
+              <strong>{v}</strong>
+            </div>
+          ))}
+        </Card>
 
-        <div style={{ flex: 1 }}>
-          <h3>SLA İhlalleri</h3>
-          <p style={{ fontSize: 24, color: stats.slaBreached > 0 ? 'red' : 'green' }}>
+        <Card title="SLA İhlalleri">
+          <p style={{ fontSize: '2rem', fontWeight: 700, color: stats.slaBreached > 0 ? 'var(--danger)' : 'var(--success)' }}>
             {stats.slaBreached}
           </p>
-        </div>
+          {stats.slaBreached > 0 && <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Ticket SLA süresini aştı</p>}
+        </Card>
 
-        <div style={{ flex: 1 }}>
-          <h3>Ajan İş Yükü</h3>
-          <ul>
-            {Object.entries(stats.agentWorkload).map(([k, v]) => (
-              <li key={k} style={{ fontSize: 12 }}>Ajan: {String(v)} ticket</li>
-            ))}
-          </ul>
-        </div>
+        <Card title="Ajan İş Yükü">
+          {Object.entries(stats.agentWorkload).length === 0 ? (
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Ajan bulunamadı</p>
+          ) : (
+            Object.entries(stats.agentWorkload).map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.9rem' }}>
+                <span>Ajan</span>
+                <strong>{v} ticket</strong>
+              </div>
+            ))
+          )}
+        </Card>
       </div>
 
       {breaches && breaches.tickets?.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <h3>SLA İhlal Listesi</h3>
+        <Card title="SLA İhlal Listesi">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ textAlign: 'left' }}>
+              <tr>
                 <th>No</th><th>Başlık</th><th>Durum</th><th>Öncelik</th>
               </tr>
             </thead>
             <tbody>
-              {breaches.tickets.map((t: Record<string, unknown>) => (
-                <tr key={t.id} style={{ borderBottom: '1px solid #eee' }}>
+              {breaches.tickets.map((t) => (
+                <tr key={t.id}>
                   <td>{t.displayId}</td>
                   <td>{t.title}</td>
-                  <td>{t.status}</td>
-                  <td>{t.priority}</td>
+                  <td><StatusBadge status={t.status} /></td>
+                  <td><PriorityBadge priority={t.priority} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
     </div>
   );

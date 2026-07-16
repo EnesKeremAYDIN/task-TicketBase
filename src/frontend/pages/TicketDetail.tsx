@@ -1,27 +1,43 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getTicket, updateTicketStatus, claimTicket, getComments, createComment } from '../lib/api';
+import { getTicket, updateTicketStatus, claimTicket, assignTicket, getComments, createComment } from '../lib/api';
+import { getAgents } from '../lib/api';
+import type { Ticket as TicketType, Comment, Agent } from '../lib/types';
+import Card from '../components/Card/Card';
+import StatusBadge from '../components/StatusBadge/StatusBadge';
+import PriorityBadge from '../components/PriorityBadge/PriorityBadge';
+import Button from '../components/Button/Button';
+import Textarea from '../components/Textarea/Textarea';
+import Select from '../components/Select/Select';
+import Modal from '../components/Modal/Modal';
+import Loading from '../components/Loading/Loading';
 
 function TicketDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [ticket, setTicket] = useState<Record<string, unknown> | null>(null);
-  const [comments, setComments] = useState<Record<string, unknown>[]>([]);
+  const [ticket, setTicket] = useState<TicketType | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [commentType, setCommentType] = useState('public_reply');
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [showAssign, setShowAssign] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isAgent = user.role === 'agent' || user.role === 'admin';
 
   async function load() {
     if (!id) return;
-    const t = await getTicket(id);
+    const [t, c] = await Promise.all([getTicket(id), getComments(id)]);
     setTicket(t);
-    const c = await getComments(id);
     setComments(c);
   }
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    load();
+    if (user.role === 'admin') getAgents().then(setAgents);
+  }, [id]);
 
-  if (!ticket) return <div>Yükleniyor...</div>;
+  if (!ticket) return <Loading />;
 
   async function handleStatus(newStatus: string) {
     if (!id) return;
@@ -35,6 +51,13 @@ function TicketDetail() {
     load();
   }
 
+  async function handleAssign() {
+    if (!id || !selectedAgent) return;
+    await assignTicket(id, selectedAgent);
+    setShowAssign(false);
+    load();
+  }
+
   async function handleComment(e: React.FormEvent) {
     e.preventDefault();
     if (!id || !newComment) return;
@@ -43,57 +66,84 @@ function TicketDetail() {
     load();
   }
 
-  const isAgent = user.role === 'agent' || user.role === 'admin';
+  const statusActions: Record<string, string[]> = {
+    new: ['open'],
+    open: ['pending', 'resolved'],
+    pending: ['open'],
+    resolved: ['closed'],
+  };
 
   return (
     <div>
-      <button onClick={() => navigate('/tickets')}>← Geri</button>
+      <Button variant="ghost" onClick={() => navigate('/tickets')} style={{ marginBottom: 16 }}>&larr; Geri</Button>
 
-      <h2>{ticket.displayId}: {ticket.title}</h2>
+      <Card>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+          <h2 style={{ fontSize: '1.2rem', margin: 0 }}>{ticket.displayId}: {ticket.title}</h2>
+          <StatusBadge status={ticket.status} />
+          <PriorityBadge priority={ticket.priority} />
+          {ticket.slaBreached && <span style={{ color: 'var(--danger)', fontWeight: 600, fontSize: '0.85rem' }}>SLA İhlali</span>}
+        </div>
 
-      <div style={{ display: 'flex', gap: 16, margin: '8px 0' }}>
-        <span>Durum: <strong>{ticket.status}</strong></span>
-        <span>Öncelik: <strong>{ticket.priority}</strong></span>
-        <span>Müşteri: <strong>{ticket.customer?.name}</strong></span>
-        <span>Ajan: <strong>{ticket.assignedTo?.name || 'Atanmamış'}</strong></span>
-      </div>
+        <div style={{ display: 'flex', gap: 16, color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 12 }}>
+          <span>Müşteri: <strong>{ticket.customer?.name}</strong></span>
+          <span>Ajan: <strong>{ticket.assignedTo?.name || 'Atanmamış'}</strong></span>
+          <span>Oluşturma: <strong>{new Date(ticket.createdAt).toLocaleDateString('tr-TR')}</strong></span>
+        </div>
 
-      <p>{ticket.description}</p>
+        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>{ticket.description}</p>
+      </Card>
 
       {isAgent && (
-        <div style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
-          {ticket.status === 'new' && <button onClick={() => handleStatus('open')}>Aç</button>}
-          {ticket.status === 'open' && <button onClick={() => handleStatus('pending')}>Beklemeye Al</button>}
-          {ticket.status === 'open' && <button onClick={() => handleStatus('resolved')}>Çözüldü</button>}
-          {ticket.status === 'pending' && <button onClick={() => handleStatus('open')}>Tekrar Aç</button>}
-          {ticket.status === 'resolved' && <button onClick={() => handleStatus('closed')}>Kapat</button>}
+        <div style={{ display: 'flex', gap: 8, margin: '12px 0', flexWrap: 'wrap' }}>
+          {statusActions[ticket.status]?.map((s) => (
+            <Button key={s} size="sm" onClick={() => handleStatus(s)}>
+              {s === 'open' ? 'Aç' : s === 'pending' ? 'Beklemeye Al' : s === 'resolved' ? 'Çözüldü' : s === 'closed' ? 'Kapat' : s}
+            </Button>
+          ))}
           {!ticket.assignedTo && user.role === 'agent' && (
-            <button onClick={handleClaim}>Üstlen</button>
+            <Button variant="secondary" size="sm" onClick={handleClaim}>Üstlen</Button>
+          )}
+          {user.role === 'admin' && (
+            <Button variant="secondary" size="sm" onClick={() => setShowAssign(true)}>
+              {ticket.assignedTo ? 'Ajan Değiştir' : 'Ajan Ata'}
+            </Button>
           )}
         </div>
       )}
 
-      <hr />
+      <Modal open={showAssign} onClose={() => setShowAssign(false)} title="Ajan Ata">
+        <Select label="Ajan Seç" value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)} options={agents.map((a) => ({ value: a.id, label: a.name }))} />
+        <Button onClick={handleAssign} disabled={!selectedAgent} style={{ marginTop: 8 }}>Ata</Button>
+      </Modal>
 
-      <h3>Yorumlar</h3>
-      {comments.map((c) => (
-        <div key={c.id} style={{ margin: '4px 0', padding: 8, background: '#f5f5f5', borderRadius: 4 }}>
-          <small><strong>{c.author?.name}</strong> ({c.type === 'internal_note' ? 'İç Not' : 'Genel'})</small>
-          <p style={{ margin: '4px 0' }}>{c.body}</p>
-        </div>
-      ))}
-
-      <form onSubmit={handleComment} style={{ marginTop: 16 }}>
-        <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Yorumunuz..." required style={{ width: '100%' }} />
-        <br />
-        {isAgent && (
-          <select value={commentType} onChange={(e) => setCommentType(e.target.value)} style={{ margin: '4px 0' }}>
-            <option value="public_reply">Genel Yanıt</option>
-            <option value="internal_note">İç Not</option>
-          </select>
+      <Card title="Yorumlar" style={{ marginTop: 16 }}>
+        {comments.length === 0 ? (
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Henüz yorum yok.</p>
+        ) : (
+          comments.map((c) => (
+            <div key={c.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+                <strong style={{ fontSize: '0.85rem' }}>{c.author?.name}</strong>
+                {c.type === 'internal_note' && <span style={{ fontSize: '0.75rem', color: 'var(--warning)', fontWeight: 600 }}>İç Not</span>}
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(c.createdAt).toLocaleString('tr-TR')}</span>
+              </div>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{c.body}</p>
+            </div>
+          ))
         )}
-        <button type="submit">Gönder</button>
-      </form>
+
+        <form onSubmit={handleComment} style={{ marginTop: 16 }}>
+          <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Yorumunuz..." required />
+          {isAgent && (
+            <Select value={commentType} onChange={(e) => setCommentType(e.target.value)} options={[
+              { value: 'public_reply', label: 'Genel Yanıt' },
+              { value: 'internal_note', label: 'İç Not' },
+            ]} />
+          )}
+          <Button type="submit" style={{ marginTop: 4 }}>Gönder</Button>
+        </form>
+      </Card>
     </div>
   );
 }

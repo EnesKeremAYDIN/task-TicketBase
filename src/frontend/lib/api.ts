@@ -95,3 +95,7 @@ export async function getSlaBreaches(page = 1) {
 export async function getRules() {
   return request('/rules');
 }
+
+export async function getAgents() {
+  return request('/agents');
+}

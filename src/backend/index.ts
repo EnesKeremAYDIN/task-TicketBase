@@ -10,6 +10,7 @@ import { inboundEmailRoutes } from './routes/inbound-email';
 import { commentRoutes } from './routes/comment';
 import { slaRoutes } from './routes/sla';
 import { rulesRoutes } from './routes/rules';
+import { agentRoutes } from './routes/agent';
 import { AppError } from './lib/errors';
 import { autoCloseResolvedTickets } from './services/sla';
 
@@ -57,6 +58,7 @@ const start = async () => {
   await app.register(commentRoutes);
   await app.register(slaRoutes);
   await app.register(rulesRoutes);
+  await app.register(agentRoutes);
 
   const AUTO_CLOSE_INTERVAL = 60 * 60 * 1000;
   setInterval(async () => {

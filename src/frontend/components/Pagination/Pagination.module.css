@@ -1,0 +1,2 @@
+.wrapper { display: flex; align-items: center; gap: 8px; margin-top: 16px; justify-content: center; }
+.info { font-size: 0.85rem; color: var(--text-secondary); }

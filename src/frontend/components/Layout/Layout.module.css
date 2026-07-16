@@ -1,0 +1,11 @@
+.nav {
+  display: flex; align-items: center; gap: 16px; padding: 0 20px; height: 56px;
+  background: var(--white); border-bottom: 1px solid var(--border);
+}
+.brand { font-weight: 700; font-size: 1.1rem; color: var(--deep-space-blue); margin-right: 8px; }
+.link { color: var(--text-secondary); font-size: 0.9rem; font-weight: 500; padding: 4px 0; }
+.link:hover { color: var(--primary); }
+.activeLink { color: var(--primary); }
+.spacer { flex: 1; }
+.userInfo { font-size: 0.85rem; color: var(--text-secondary); }
+.main { padding: 24px; max-width: 1200px; margin: 0 auto; }

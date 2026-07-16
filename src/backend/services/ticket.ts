@@ -83,7 +83,26 @@ export async function listTickets(params: ListTicketsParams) {
     prisma.ticket.count({ where }),
   ]);
 
-  return { tickets, total, page: params.page, limit: params.limit };
+  const ticketIds = tickets.map((t) => t.id);
+
+  const lastComments = await prisma.comment.findMany({
+    where: { ticketId: { in: ticketIds } },
+    orderBy: { createdAt: 'desc' },
+    distinct: ['ticketId'],
+    include: { author: { select: { name: true } } },
+  });
+
+  const commentMap = new Map(lastComments.map((c) => [c.ticketId, c]));
+
+  const ticketsWithLastComment = tickets.map((ticket) => {
+    const lastComment = commentMap.get(ticket.id);
+    return {
+      ...ticket,
+      lastComment: lastComment ? { body: lastComment.body, createdAt: lastComment.createdAt, author: { name: lastComment.author.name } } : null,
+    };
+  });
+
+  return { tickets: ticketsWithLastComment, total, page: params.page, limit: params.limit };
 }
 
 export async function getTicketById(ticketId: string, tenantId: string, userId?: string, userRole?: string) {

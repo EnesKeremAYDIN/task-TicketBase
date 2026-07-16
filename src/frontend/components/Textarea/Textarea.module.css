@@ -1,0 +1,7 @@
+.wrapper { margin-bottom: 12px; }
+.label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 4px; }
+.textarea {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: 0.9rem; outline: none; resize: vertical; min-height: 80px;
+}
+.textarea:focus { border-color: var(--primary); }

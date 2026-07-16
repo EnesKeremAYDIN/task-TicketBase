@@ -1,24 +1,26 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { listTickets, createTicket, claimTicket } from '../lib/api';
-
-interface Ticket {
-  id: string;
-  displayId: string;
-  title: string;
-  status: string;
-  priority: string;
-  customer: { name: string };
-  assignedTo: { name: string } | null;
-  createdAt: string;
-}
+import type { Ticket, Status, Priority } from '../lib/types';
+import Card from '../components/Card/Card';
+import StatusBadge from '../components/StatusBadge/StatusBadge';
+import PriorityBadge from '../components/PriorityBadge/PriorityBadge';
+import Pagination from '../components/Pagination/Pagination';
+import Button from '../components/Button/Button';
+import Input from '../components/Input/Input';
+import Select from '../components/Select/Select';
+import Textarea from '../components/Textarea/Textarea';
+import Loading from '../components/Loading/Loading';
+import EmptyState from '../components/EmptyState/EmptyState';
 
 function TicketList() {
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -26,21 +28,37 @@ function TicketList() {
   const [error, setError] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
+  const isAgent = user.role === 'agent' || user.role === 'admin';
+
   async function load() {
-    const params: Record<string, string> = { page: String(page), limit: '20' };
-    if (filter) params.status = filter;
-    if (search) params.search = search;
-    const data = await listTickets(params);
-    setTickets(data.tickets);
-    setTotal(data.total);
+    setLoading(true);
+    try {
+      const params: Record<string, string> = { page: String(page), limit: '20' };
+      if (statusFilter) params.status = statusFilter;
+      if (search) params.search = search;
+      const data = await listTickets(params);
+      setTickets(data.tickets);
+      setTotal(data.total);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('yetkiniz')) {
+        navigate('/tickets');
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => { load(); }, [page, filter, search]);
+  useEffect(() => { load(); }, [page, statusFilter]);
+
+  function handleSearch() {
+    setPage(1);
+    load();
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await createTicket({ title: newTitle, description: newDesc, priority: newPrio });
+      await createTicket({ title: newTitle, description: newDesc, priority: newPrio as Priority });
       setShowCreate(false);
       setNewTitle('');
       setNewDesc('');
@@ -56,79 +74,89 @@ function TicketList() {
     load();
   }
 
-  const statusColors: Record<string, string> = {
-    new: '#3498db', open: '#2ecc71', pending: '#f39c12', resolved: '#95a5a6', closed: '#7f8c8d',
-  };
+  const statusOptions = [
+    { value: '', label: 'Tümü' },
+    { value: 'new', label: 'Yeni' },
+    { value: 'open', label: 'Açık' },
+    { value: 'pending', label: 'Beklemede' },
+    { value: 'resolved', label: 'Çözüldü' },
+    { value: 'closed', label: 'Kapalı' },
+  ];
 
   return (
     <div>
-      <h2>Ticket Listesi</h2>
-
-      {user.role === 'customer' && (
-        <button onClick={() => setShowCreate(!showCreate)}>
-          {showCreate ? 'İptal' : 'Yeni Ticket'}
-        </button>
-      )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h2 style={{ fontSize: '1.3rem' }}>Ticket Listesi</h2>
+        {user.role === 'customer' && (
+          <Button onClick={() => setShowCreate(!showCreate)} variant={showCreate ? 'secondary' : 'primary'}>
+            {showCreate ? 'İptal' : 'Yeni Ticket'}
+          </Button>
+        )}
+      </div>
 
       {showCreate && (
-        <form onSubmit={handleCreate} style={{ margin: '8px 0', padding: 8, border: '1px solid #ccc' }}>
-          <input placeholder="Başlık" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} required />
-          <br />
-          <textarea placeholder="Açıklama" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} required />
-          <br />
-          <select value={newPrio} onChange={(e) => setNewPrio(e.target.value)}>
-            <option value="low">Düşük</option>
-            <option value="normal">Normal</option>
-            <option value="high">Yüksek</option>
-            <option value="urgent">Acil</option>
-          </select>
-          <button type="submit">Oluştur</button>
-          {error && <p style={{ color: 'red' }}>{error}</p>}
-        </form>
+        <Card>
+          <form onSubmit={handleCreate}>
+            <Input label="Başlık" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} required />
+            <Textarea label="Açıklama" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} required />
+            <Select label="Öncelik" value={newPrio} onChange={(e) => setNewPrio(e.target.value)} options={[
+              { value: 'low', label: 'Düşük' }, { value: 'normal', label: 'Normal' },
+              { value: 'high', label: 'Yüksek' }, { value: 'urgent', label: 'Acil' },
+            ]} />
+            {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
+            <Button type="submit" style={{ marginTop: 8 }}>Oluştur</Button>
+          </form>
+        </Card>
       )}
 
-      <div style={{ margin: '8px 0' }}>
-        <select value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1); }}>
-          <option value="">Tümü</option>
-          <option value="new">Yeni</option>
-          <option value="open">Açık</option>
-          <option value="pending">Beklemede</option>
-          <option value="resolved">Çözüldü</option>
-          <option value="closed">Kapalı</option>
-        </select>
-        <input placeholder="Ara..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} style={{ marginLeft: 8 }} />
-      </div>
+      {isAgent && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'end' }}>
+          <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} options={statusOptions} />
+          <div style={{ display: 'flex', gap: 4, alignItems: 'end' }}>
+            <Input placeholder="Ara..." value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
+            <Button variant="secondary" size="sm" onClick={handleSearch}>Ara</Button>
+          </div>
+        </div>
+      )}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ textAlign: 'left' }}>
-            <th>No</th><th>Başlık</th><th>Durum</th><th>Öncelik</th><th>Müşteri</th><th>Ajan</th><th>İşlem</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tickets.map((t) => (
-            <tr key={t.id} style={{ borderBottom: '1px solid #eee' }}>
-              <td>{t.displayId}</td>
-              <td><Link to={`/tickets/${t.id}`}>{t.title}</Link></td>
-              <td><span style={{ color: statusColors[t.status] || '#000' }}>{t.status}</span></td>
-              <td>{t.priority}</td>
-              <td>{t.customer?.name}</td>
-              <td>{t.assignedTo?.name || '-'}</td>
-              <td>
-                {user.role === 'agent' && !t.assignedTo && (
-                  <button onClick={() => handleClaim(t.id)}>Üstlen</button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div style={{ marginTop: 8 }}>
-        <button disabled={page <= 1} onClick={() => setPage(page - 1)}>Önceki</button>
-        <span style={{ margin: '0 8px' }}>Sayfa {page} / {Math.ceil(total / 20)}</span>
-        <button disabled={page >= Math.ceil(total / 20)} onClick={() => setPage(page + 1)}>Sonraki</button>
-      </div>
+      {loading ? <Loading /> : tickets.length === 0 ? (
+        <EmptyState title="Ticket bulunamadı" description="Filtreleri değiştirmeyi deneyin." />
+      ) : isAgent ? (
+        <Card>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th>No</th><th>Başlık</th><th>Durum</th><th>Öncelik</th><th>Müşteri</th><th>Ajan</th><th>Son Yorum</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {tickets.map((t) => (
+                <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/tickets/${t.id}`)}>
+                  <td>{t.displayId}</td>
+                  <td style={{ fontWeight: 500 }}>{t.title}</td>
+                  <td><StatusBadge status={t.status} /></td>
+                  <td><PriorityBadge priority={t.priority} /></td>
+                  <td>{t.customer?.name}</td>
+                  <td>{t.assignedTo?.name || '-'}</td>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {t.lastComment ? `${t.lastComment.author.name}: ${t.lastComment.body}` : '-'}
+                  </td>
+                  <td>
+                    {user.role === 'agent' && !t.assignedTo && t.status !== 'closed' && (
+                      <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handleClaim(t.id); }}>Üstlen</Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Pagination page={page} total={total} limit={20} onChange={setPage} />
+        </Card>
+      ) : (
+        <Card>
+          <p>Müşteri olarak ticket listesini görüntüleyemezsiniz.</p>
+        </Card>
+      )}
     </div>
   );
 }

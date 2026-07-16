@@ -1,0 +1,19 @@
+import styles from './Select.module.css';
+
+interface Option { value: string; label: string; }
+
+interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label?: string;
+  options: Option[];
+}
+
+export default function Select({ label, options, className, ...rest }: SelectProps) {
+  return (
+    <div className={styles.wrapper}>
+      {label && <label className={styles.label}>{label}</label>}
+      <select className={`${styles.select} ${className || ''}`} {...rest}>
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
+}
