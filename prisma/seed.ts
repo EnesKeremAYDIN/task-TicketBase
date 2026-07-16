@@ -135,7 +135,7 @@ async function main() {
       });
     }
 
-    const ticketCount = 6000;
+    const ticketCount = 25000;
     console.log(`  ${ticketCount} ticket oluşturuluyor...`);
 
     const batchSize = 1000;
@@ -177,7 +177,7 @@ async function main() {
       select: { id: true, customerId: true, assignedToId: true, status: true, createdAt: true },
     });
 
-    const commentCount = 24000;
+    const commentCount = 100000;
     console.log(`  ${commentCount} yorum oluşturuluyor...`);
 
     for (let batch = 0; batch < commentCount; batch += batchSize) {
