@@ -32,6 +32,10 @@ export async function createComment(
     throw new NotFoundError('Ticket bulunamadı');
   }
 
+  if (ticket.status === 'closed' && authorRole !== 'admin') {
+    throw new ValidationError('Kapalı ticket\'a yorum eklenemez');
+  }
+
   const comment = await prisma.$transaction(async (tx) => {
     const isFirstPublicReply = type === 'public_reply' && !ticket.firstResponseAt;
 

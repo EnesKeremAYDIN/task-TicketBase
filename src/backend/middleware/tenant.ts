@@ -2,7 +2,9 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { PUBLIC_ROUTES } from '../lib/constants';
 
 export async function tenantMiddleware(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  if (PUBLIC_ROUTES.includes(request.url)) {
+  const path = request.url.split('?')[0];
+
+  if (PUBLIC_ROUTES.includes(path)) {
     return;
   }
 

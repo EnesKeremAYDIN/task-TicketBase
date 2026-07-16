@@ -51,16 +51,20 @@ export async function processInboundEmail(payload: InboundPayload) {
         where: { email: payload.from, tenantId: tenant.id, role: 'customer' },
       });
 
-      const authorId = ticket.customerId;
       if (!customer) {
         await updateInboundStatus(inboundMessage.id, 'failed');
         throw new NotFoundError('Gönderen kullanıcı bulunamadı');
       }
 
+      if (customer.id !== ticket.customerId) {
+        await updateInboundStatus(inboundMessage.id, 'failed');
+        throw new ValidationError('Gönderen e-posta ticket sahibiyle eşleşmiyor');
+      }
+
       const comment = await prisma.comment.create({
         data: {
           ticketId: ticket.id,
-          authorId,
+          authorId: customer.id,
           type: 'public_reply',
           body: payload.body,
         },

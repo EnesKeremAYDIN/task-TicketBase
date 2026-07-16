@@ -54,11 +54,12 @@ model Ticket {
   customer        User      @relation("CustomerTickets", fields: [customerId], references: [id])
   assignedToId    String?
   assignedTo      User?     @relation("AssignedTickets", fields: [assignedToId], references: [id])
-  firstResponseAt DateTime?
-  resolvedAt      DateTime?
-  closedAt        DateTime?
-  slaDueAt        DateTime?
-  slaBreached     Boolean   @default(false)
+  firstResponseAt     DateTime?
+  firstResponseSlaDue DateTime?
+  resolvedAt          DateTime?
+  closedAt            DateTime?
+  slaDueAt            DateTime?
+  slaBreached         Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

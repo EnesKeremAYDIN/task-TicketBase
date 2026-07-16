@@ -1,6 +1,8 @@
 import prisma from '../lib/prisma';
 import { addBusinessMinutes } from '../lib/business-hours';
 
+const BUSINESS_HOURS_PER_DAY = 9;
+
 export async function calculateSLADeadlines(ticketId: string, tenantId: string): Promise<void> {
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -22,44 +24,51 @@ export async function calculateSLADeadlines(ticketId: string, tenantId: string):
 
   const holidayDates = holidays.map((h) => h.date);
 
+  const firstResponseMinutes = slaPolicy.firstResponseH * 60;
+  const firstResponseSlaDue = addBusinessMinutes(ticket.createdAt, firstResponseMinutes, holidayDates);
+
   const slaMinutes = slaPolicy.resolutionIsBD
-    ? slaPolicy.resolutionH * 8 * 60
+    ? slaPolicy.resolutionH * BUSINESS_HOURS_PER_DAY * 60
     : slaPolicy.resolutionH * 60;
 
   const slaDueAt = addBusinessMinutes(ticket.createdAt, slaMinutes, holidayDates);
 
   await prisma.ticket.update({
     where: { id: ticketId },
-    data: { slaDueAt },
+    data: { slaDueAt, firstResponseSlaDue },
   });
 }
 
 export async function markBreachedTickets(tenantId?: string): Promise<number> {
-  const where: Record<string, unknown> = {
-    slaDueAt: { not: null },
+  const now = new Date();
+
+  const baseFilter = {
     slaBreached: false,
     status: { notIn: ['resolved', 'closed'] },
     ...(tenantId ? { tenantId } : {}),
   };
 
-  const now = new Date();
+  const [resBreached, firstResBreached] = await Promise.all([
+    prisma.ticket.findMany({
+      where: { ...baseFilter, slaDueAt: { not: null, lt: now } },
+      select: { id: true },
+    }),
+    prisma.ticket.findMany({
+      where: { ...baseFilter, firstResponseSlaDue: { not: null, lt: now }, firstResponseAt: null },
+      select: { id: true },
+    }),
+  ]);
 
-  const breached = await prisma.ticket.findMany({
-    where: {
-      ...where,
-      slaDueAt: { lt: now },
-    },
-    select: { id: true },
-  });
+  const allBreached = [...new Set([...resBreached, ...firstResBreached].map((t) => t.id))];
 
-  if (breached.length === 0) return 0;
+  if (allBreached.length === 0) return 0;
 
   await prisma.ticket.updateMany({
-    where: { id: { in: breached.map((t) => t.id) } },
+    where: { id: { in: allBreached } },
     data: { slaBreached: true },
   });
 
-  return breached.length;
+  return allBreached.length;
 }
 
 export async function getSlaBreachList(tenantId: string, page = 1, limit = 20) {
@@ -83,28 +92,48 @@ export async function getSlaBreachList(tenantId: string, page = 1, limit = 20) {
 }
 
 export async function getDashboardStats(tenantId: string) {
-  const allTickets = await prisma.ticket.findMany({
-    where: { tenantId },
-    select: { status: true, priority: true, assignedToId: true, slaBreached: true },
+  const [statusBreakdown, priorityBreakdown, slaBreached, agentWorkload] = await Promise.all([
+    prisma.ticket.groupBy({
+      by: ['status'],
+      where: { tenantId },
+      _count: true,
+    }),
+    prisma.ticket.groupBy({
+      by: ['priority'],
+      where: { tenantId },
+      _count: true,
+    }),
+    prisma.ticket.count({
+      where: { tenantId, slaBreached: true },
+    }),
+    prisma.ticket.groupBy({
+      by: ['assignedToId'],
+      where: { tenantId, assignedToId: { not: null }, status: { notIn: ['resolved', 'closed'] } },
+      _count: true,
+    }),
+  ]);
+
+  return {
+    statusBreakdown: Object.fromEntries(statusBreakdown.map((r) => [r.status, r._count])),
+    priorityBreakdown: Object.fromEntries(priorityBreakdown.map((r) => [r.priority, r._count])),
+    slaBreached,
+    agentWorkload: Object.fromEntries(agentWorkload.map((r) => [r.assignedToId || '', r._count])),
+  };
+}
+
+export async function autoCloseResolvedTickets(tenantId?: string): Promise<number> {
+  const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+
+  const where: Record<string, unknown> = {
+    status: 'resolved',
+    updatedAt: { lt: fiveDaysAgo },
+    ...(tenantId ? { tenantId } : {}),
+  };
+
+  const result = await prisma.ticket.updateMany({
+    where,
+    data: { status: 'closed', closedAt: new Date() },
   });
 
-  const statusBreakdown: Record<string, number> = {};
-  const priorityBreakdown: Record<string, number> = {};
-  const agentWorkload: Record<string, number> = {};
-  let slaBreached = 0;
-
-  for (const ticket of allTickets) {
-    statusBreakdown[ticket.status] = (statusBreakdown[ticket.status] || 0) + 1;
-    priorityBreakdown[ticket.priority] = (priorityBreakdown[ticket.priority] || 0) + 1;
-
-    if (ticket.assignedToId) {
-      agentWorkload[ticket.assignedToId] = (agentWorkload[ticket.assignedToId] || 0) + 1;
-    }
-
-    if (ticket.slaBreached) {
-      slaBreached++;
-    }
-  }
-
-  return { statusBreakdown, priorityBreakdown, slaBreached, agentWorkload };
+  return result.count;
 }

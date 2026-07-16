@@ -1,7 +1,7 @@
 import { ValidationError } from './errors';
 
 const TRANSITIONS: Record<string, string[]> = {
-  new: ['open', 'closed'],
+  new: ['open'],
   open: ['pending', 'resolved', 'closed'],
   pending: ['open', 'closed'],
   resolved: ['closed'],

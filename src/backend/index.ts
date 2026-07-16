@@ -8,7 +8,9 @@ import { ticketRoutes } from './routes/ticket';
 import { inboundEmailRoutes } from './routes/inbound-email';
 import { commentRoutes } from './routes/comment';
 import { slaRoutes } from './routes/sla';
+import { rulesRoutes } from './routes/rules';
 import { AppError } from './lib/errors';
+import { autoCloseResolvedTickets } from './services/sla';
 
 const app = Fastify({ logger: true });
 
@@ -27,9 +29,15 @@ app.setErrorHandler((error, _request, reply) => {
 });
 
 const start = async () => {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    app.log.error('JWT_SECRET ortam değişkeni zorunludur');
+    process.exit(1);
+  }
+
   await app.register(cors);
   await app.register(fjwt, {
-    secret: process.env.JWT_SECRET || 'fallback-dev-secret',
+    secret: jwtSecret,
     sign: { expiresIn: '7d' },
   });
 
@@ -41,6 +49,17 @@ const start = async () => {
   await app.register(inboundEmailRoutes);
   await app.register(commentRoutes);
   await app.register(slaRoutes);
+  await app.register(rulesRoutes);
+
+  const AUTO_CLOSE_INTERVAL = 60 * 60 * 1000;
+  setInterval(async () => {
+    try {
+      const count = await autoCloseResolvedTickets();
+      if (count > 0) app.log.info(`${count} ticket otomatik kapatıldı`);
+    } catch (err) {
+      app.log.error(err, 'Otomatik kapatma hatası');
+    }
+  }, AUTO_CLOSE_INTERVAL);
 
   try {
     await app.listen({ port: Number(process.env.PORT) || 3000, host: '0.0.0.0' });

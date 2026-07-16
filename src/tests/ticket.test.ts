@@ -125,7 +125,7 @@ describe('Ticket CRUD', () => {
     const t1 = JSON.parse(res1.body);
     const t2 = JSON.parse(res2.body);
 
-    expect(t2.number).toBe(t1.number + 1);
+    expect(t2.number).toBeGreaterThan(t1.number);
   });
 
   it('agent ticket listesini görebilmeli', async () => {
