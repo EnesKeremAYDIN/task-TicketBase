@@ -7,8 +7,13 @@ import styles from './Layout.module.css';
 function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const raw = localStorage.getItem('user');
-  const user = raw ? JSON.parse(raw) : {};
+  let user = {};
+  try {
+    const raw = localStorage.getItem('user');
+    if (raw) user = JSON.parse(raw);
+  } catch {
+    user = {};
+  }
 
   useEffect(() => {
     if (!getToken()) navigate('/login');

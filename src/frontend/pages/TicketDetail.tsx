@@ -20,50 +20,95 @@ function TicketDetail() {
   const [newComment, setNewComment] = useState('');
   const [commentType, setCommentType] = useState('public_reply');
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState('');
+  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isAgent = user.role === 'agent' || user.role === 'admin';
 
   async function load() {
     if (!id) return;
-    const [t, c] = await Promise.all([getTicket(id), getComments(id)]);
-    setTicket(t);
-    setComments(c);
+    setError('');
+    try {
+      const [t, c] = await Promise.all([getTicket(id), getComments(id)]);
+      setTicket(t);
+      setComments(c);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ticket yüklenirken hata oluştu');
+      setTicket(null);
+    }
   }
 
   useEffect(() => {
     load();
-    if (user.role === 'admin') getAgents().then(setAgents);
+    if (user.role === 'admin') {
+      setAgentsLoading(true);
+      getAgents().then(setAgents).finally(() => setAgentsLoading(false));
+    }
   }, [id]);
+
+  if (error) {
+    return (
+      <div>
+        <Card>
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: 16 }}>{error}</p>
+            <Button onClick={() => navigate('/tickets')}>&larr; Ticket Listesine Dön</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   if (!ticket) return <Loading />;
 
   async function handleStatus(newStatus: string) {
     if (!id) return;
-    await updateTicketStatus(id, newStatus);
-    load();
+    setActionError('');
+    try {
+      await updateTicketStatus(id, newStatus);
+      load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'İşlem başarısız');
+    }
   }
 
   async function handleClaim() {
     if (!id) return;
-    await claimTicket(id);
-    load();
+    setActionError('');
+    try {
+      await claimTicket(id);
+      load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Üstlenme başarısız');
+    }
   }
 
   async function handleAssign() {
     if (!id || !selectedAgent) return;
-    await assignTicket(id, selectedAgent);
-    setShowAssign(false);
-    load();
+    setActionError('');
+    try {
+      await assignTicket(id, selectedAgent);
+      setShowAssign(false);
+      load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Atama başarısız');
+    }
   }
 
   async function handleComment(e: React.FormEvent) {
     e.preventDefault();
     if (!id || !newComment) return;
-    await createComment(id, commentType, newComment);
-    setNewComment('');
-    load();
+    setActionError('');
+    try {
+      await createComment(id, commentType, newComment);
+      setNewComment('');
+      load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Yorum gönderilemedi');
+    }
   }
 
   const statusActions: Record<string, string[]> = {
@@ -94,7 +139,7 @@ function TicketDetail() {
       </Card>
 
       {isAgent && (
-        <div style={{ display: 'flex', gap: 8, margin: '12px 0', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, margin: '12px 0', flexWrap: 'wrap', alignItems: 'center' }}>
           {statusActions[ticket.status]?.map((s) => (
             <Button key={s} size="sm" onClick={() => handleStatus(s)}>
               {s === 'open' ? 'Aç' : s === 'pending' ? 'Beklemeye Al' : s === 'resolved' ? 'Çözüldü' : s === 'closed' ? 'Kapat' : s}
@@ -108,12 +153,19 @@ function TicketDetail() {
               {ticket.assignedTo ? 'Ajan Değiştir' : 'Ajan Ata'}
             </Button>
           )}
+          {actionError && <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{actionError}</span>}
         </div>
       )}
 
       <Modal open={showAssign} onClose={() => setShowAssign(false)} title="Ajan Ata">
-        <Select label="Ajan Seç" value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)} options={agents.map((a) => ({ value: a.id, label: a.name }))} />
-        <Button onClick={handleAssign} disabled={!selectedAgent} style={{ marginTop: 8 }}>Ata</Button>
+        {agentsLoading ? (
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Ajanlar yükleniyor...</p>
+        ) : (
+          <>
+            <Select label="Ajan Seç" value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)} options={agents.map((a) => ({ value: a.id, label: a.name }))} />
+            <Button onClick={handleAssign} disabled={!selectedAgent} style={{ marginTop: 8 }}>Ata</Button>
+          </>
+        )}
       </Modal>
 
       <Card title="Yorumlar" style={{ marginTop: 16 }}>

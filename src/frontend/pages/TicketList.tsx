@@ -143,18 +143,18 @@ function TicketList() {
       {isAgent && stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 20 }}>
           <Card title="Durum Dağılımı">
-            {Object.entries(stats.statusBreakdown).map(([k, v]) => (
+            {(['new', 'open', 'pending', 'resolved', 'closed'] as const).map((k) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '0.85rem' }}>
-                <span>{statusLabels[k] || k}</span>
-                <strong>{v}</strong>
+                <span>{statusLabels[k]}</span>
+                <strong>{stats.statusBreakdown[k] || 0}</strong>
               </div>
             ))}
           </Card>
           <Card title="Öncelik Dağılımı">
-            {Object.entries(stats.priorityBreakdown).map(([k, v]) => (
+            {(['urgent', 'high', 'normal', 'low'] as const).map((k) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '0.85rem' }}>
-                <PriorityBadge priority={k as 'low' | 'normal' | 'high' | 'urgent'} />
-                <strong>{v}</strong>
+                <PriorityBadge priority={k} />
+                <strong>{stats.priorityBreakdown[k] || 0}</strong>
               </div>
             ))}
           </Card>
