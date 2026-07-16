@@ -37,6 +37,19 @@ const CUSTOMER_NAMES = [
   'Büşra Özdemir', 'Murat Kılıç', 'Gamze Aslan', 'Emre Güneş',
   'Dilara Çetin', 'İsmail Kaya', 'Merve Yalçın', 'Kaan Yıldırım',
   'Aslıhan Aktaş', 'Okan Şahin', 'Ceren Bulut', 'Burak Yılmaz',
+  'Esra Karadeniz', 'Umut Ateş', 'Hande Yalçın', 'Caner Taş',
+  'Seda Korkmaz', 'Tolga Eren', 'Pınar Sarı', 'Berkay Toprak',
+  'Gizem Özer', 'Serkan Demirel', 'Ece Dağ', 'Onur Avcı',
+  'Çağla Işık', 'Yiğit Koçak', 'Leyla Tan', 'Oğuzhan Şimşek',
+  'Derya Gündüz', 'Mert Aksoy', 'Nazlı Korkut', 'Fatih Erdoğan',
+  'Tuğba Sağlam', 'Gökhan Kaya', 'Şeyma Yücel', 'Ufuk Baş',
+  'Hilal Özkan', 'Cemal Kaya', 'Rabia Demirel', 'Aykut Çalışkan',
+  'Meltem Bozkurt', 'Bora İnce', 'Nalan Yurt', 'Eren Ünal',
+  'Funda Akyüz', 'Alper Tekin', 'Yasemin Gül', 'Rıza Ekmekçi',
+  'Sevda Kılıç', 'Necdet Yıldız', 'Aylin Sarıkaya', 'Tamer Güçlü',
+  'Işıl Poyraz', 'Berke Can', 'Özge Şeker', 'Kemal Yıldırım',
+  'Bilge Yontar', 'Savaş Durmaz', 'Melis Ay', 'Hayati Öz',
+  'Sibel Boz', 'Kutay Eren', 'Nihan Kılıç', 'Ferit Kaya',
 ];
 
 const TICKET_TITLES = [
@@ -50,18 +63,62 @@ const TICKET_TITLES = [
   'Fare çalışmıyor', 'Kulaklık sorunu', 'Web kamerası algılanmıyor',
   'USB port çalışmıyor', 'Ekran kartı sürücüsü', 'Ses kartı sorunu',
   'Toplantı odası donanımı', 'Projeksiyon bağlantısı', 'Akıllı kart okuyucu',
+  'PowerPoint açılmıyor', 'Excel dosyası bozuldu', 'Outlook profili sıfırlama',
+  'Teams ses sorunu', 'Zoom bağlantı hatası', 'Slack bildirim gelmiyor',
+  'İnternet bağlantısı yavaş', 'Kablosuz ağ düşüyor', 'Erişim izni talebi',
+  'Yeni kullanıcı oluşturma', 'Disk alanı doldu', 'RAM yükseltme talebi',
+  'Sunucu yeniden başlatma', 'Log analizi talebi', 'Güvenlik taraması',
+  'Sertifika yenileme', 'API erişim hatası', 'Web sitesi yayında değil',
+  'DNS çözümleme hatası', 'SSL sertifika uyarısı', 'Yedekten geri yükleme',
+  'Sanal makine kurulumu', 'Depolama genişletme', 'Ağ kablosu arızası',
+  'UPS pil değişimi', 'Soğutma sistemi arızası', 'Kart okuyucu çalışmıyor',
+  'İmza yetkisi talebi', 'Rapor oluşturma talebi', 'Veri analizi talebi',
+  'Mobil cihaz kaydı', 'İki faktörlü kimlik doğrulama', 'E-posta imzası talebi',
+  'Takvim paylaşımı', 'Görev ataması sorunu', 'Dosya kurtarma talebi',
+];
+
+const VERBS = [
+  'açılamıyor', 'çalışmıyor', 'hata veriyor', 'bağlanamıyor',
+  'kilitlendi', 'bozuldu', 'güncellenemiyor', 'sıfırlanması gerekiyor',
+  'performans sorunu', 'yapılandırma hatası', 'uyum sorunu',
+];
+
+const NOUNS = [
+  'E-posta istemcisi', 'VPN bağlantısı', 'Ağ sürücüsü', 'Yazıcı',
+  'Tarayıcı', 'Sunucu servisi', 'Sanal makine', 'Veritabanı',
+  'Web sunucusu', 'Güvenlik duvarı', 'Proxy ayarları', 'DNS kaydı',
+  'DHCP havuzu', 'Yedekleme ajanı', 'Antivirüs yazılımı', 'Sanal özel ağ',
+  'Uzaktan masaüstü', 'Dosya sunucusu', 'E-posta kuyruğu', 'Oturum yöneticisi',
 ];
 
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function randomItem<T>(arr: readonly T[]): T {
+function randomItem<T>(arr: readonly T[] | T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function shuffle<T>(arr: readonly T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 function randomDate(start: Date, end: Date): Date {
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+}
+
+function generateTitle(): string {
+  if (Math.random() > 0.3) {
+    const verb = randomItem(VERBS);
+    const noun = randomItem(NOUNS);
+    return `${noun} ${verb}`;
+  }
+  return randomItem(TICKET_TITLES);
 }
 
 async function main() {
@@ -72,7 +129,7 @@ async function main() {
 
     const tenant = await prisma.tenant.create({ data: tenantData });
 
-    const admin = await prisma.user.create({
+    await prisma.user.create({
       data: {
         tenantId: tenant.id,
         email: `admin@${tenantData.slug}.com`,
@@ -99,14 +156,15 @@ async function main() {
 
     const customerCount = randomInt(3, 8);
     const customers: string[] = [];
+    const shuffledNames = shuffle(CUSTOMER_NAMES);
     for (let i = 0; i < customerCount; i++) {
-      const name = CUSTOMER_NAMES[customers.length % CUSTOMER_NAMES.length];
+      const name = shuffledNames[i % shuffledNames.length];
       const user = await prisma.user.create({
         data: {
           tenantId: tenant.id,
-          email: `musteri${customers.length + 1}@${tenantData.slug}.com`,
+          email: `musteri${i + 1}@${tenantData.slug}.com`,
           password: bcrypt.hashSync('123456', 10),
-          name: `${name}`,
+          name,
           role: 'customer',
         },
       });
@@ -153,13 +211,14 @@ async function main() {
           ? randomItem(agents)
           : null;
         const createdAt = randomDate(new Date('2025-01-01'), new Date('2026-06-01'));
+        const title = generateTitle();
 
         tickets.push({
           tenantId: tenant.id,
           number: ticketNumber++,
           displayId: `${tenantData.slug.toUpperCase()}-${ticketNumber - 1}`,
-          title: randomItem(TICKET_TITLES),
-          description: `${randomItem(TICKET_TITLES)} ile ilgili detaylı açıklama. Sorun giderme adımları denendi ancak çözülemedi.`,
+          title,
+          description: `${title} ile ilgili detaylı açıklama. Sorun giderme adımları denendi ancak çözülemedi.`,
           status,
           priority,
           customerId,
@@ -198,8 +257,8 @@ async function main() {
           authorId,
           type: isInternal ? 'internal_note' : 'public_reply',
           body: isInternal
-            ? `İç not: Bu ticket için takip gerekiyor. ${randomItem(TICKET_TITLES)}`
-            : `${randomItem(TICKET_TITLES)} ile ilgili olarak bilgi verildi. Müşteri bilgilendirildi.`,
+            ? `İç not: Bu ticket için takip gerekiyor. ${generateTitle()}`
+            : `${generateTitle()} ile ilgili olarak bilgi verildi. Müşteri bilgilendirildi.`,
           createdAt: commentDate,
           updatedAt: commentDate,
         });

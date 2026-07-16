@@ -75,10 +75,9 @@ function TicketDetail() {
 
   return (
     <div>
-      <Button variant="ghost" onClick={() => navigate('/tickets')} style={{ marginBottom: 16 }}>&larr; Geri</Button>
-
       <Card>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+          <button onClick={() => navigate('/tickets')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-secondary)', padding: 0, lineHeight: 1, marginRight: 8 }} title="Geri">&larr;</button>
           <h2 style={{ fontSize: '1.2rem', margin: 0 }}>{ticket.displayId}: {ticket.title}</h2>
           <StatusBadge status={ticket.status} />
           <PriorityBadge priority={ticket.priority} />

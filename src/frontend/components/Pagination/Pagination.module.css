@@ -1,2 +1,9 @@
-.wrapper { display: flex; align-items: center; gap: 8px; margin-top: 16px; justify-content: center; }
-.info { font-size: 0.85rem; color: var(--text-secondary); }
+.wrapper {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  margin: 16px 0; flex-wrap: wrap;
+}
+.info { font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap; }
+.controls { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ellipsis { padding: 0 4px; color: var(--text-secondary); font-size: 0.85rem; }
+.separator { width: 1px; height: 24px; background: var(--border); margin: 0 8px; }
+.perPage { font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap; }

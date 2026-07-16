@@ -29,8 +29,6 @@ function Layout() {
       <nav className={styles.nav}>
         <span className={styles.brand}>TicketBase</span>
         <Link to="/tickets" className={`${styles.link} ${isActive('/tickets')}`}>Ticketlar</Link>
-        <Link to="/dashboard" className={`${styles.link} ${isActive('/dashboard')}`}>Dashboard</Link>
-        {user.role === 'admin' && <Link to="/rules" className={`${styles.link} ${isActive('/rules')}`}>Kurallar</Link>}
         <div className={styles.spacer} />
         <span className={styles.userInfo}>{user.name}</span>
         <Button variant="ghost" size="sm" onClick={handleLogout}>Çıkış</Button>

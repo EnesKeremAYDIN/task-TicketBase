@@ -2,8 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import TicketList from './pages/TicketList';
 import TicketDetail from './pages/TicketDetail';
-import Dashboard from './pages/Dashboard';
-import Rules from './pages/Rules';
 import Layout from './components/Layout/Layout';
 
 function App() {
@@ -15,8 +13,6 @@ function App() {
           <Route index element={<Navigate to="/tickets" replace />} />
           <Route path="tickets" element={<TicketList />} />
           <Route path="tickets/:id" element={<TicketDetail />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="rules" element={<Rules />} />
         </Route>
       </Routes>
     </BrowserRouter>
