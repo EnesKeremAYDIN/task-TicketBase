@@ -12,7 +12,7 @@ import { inboundEmailRoutes } from '../backend/routes/inbound-email';
 import { rulesRoutes } from '../backend/routes/rules';
 import { agentRoutes } from '../backend/routes/agent';
 import { AppError } from '../backend/lib/errors';
-import { addBusinessMinutes, nextBusinessMinute } from '../backend/lib/business-hours';
+import { addBusinessMinutes } from '../backend/lib/business-hours';
 
 const TEST_WEBHOOK_SECRET = 'ticketbase-webhook-secret';
 
