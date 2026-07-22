@@ -5,6 +5,29 @@ const BUSINESS_HOURS_PER_DAY = 9;
 
 const BREACH_BATCH_SIZE = 1000;
 
+export interface SLADeadlinePolicy {
+  firstResponseH: number;
+  resolutionH: number;
+  resolutionIsBD: boolean;
+}
+
+export function calculateSLADeadlineValues(
+  createdAt: Date,
+  slaPolicy: SLADeadlinePolicy,
+  holidayDates: Date[],
+) {
+  const firstResponseMinutes = slaPolicy.firstResponseH * 60;
+  const firstResponseSlaDue = addBusinessMinutes(createdAt, firstResponseMinutes, holidayDates);
+
+  const resolutionMinutes = slaPolicy.resolutionIsBD
+    ? slaPolicy.resolutionH * BUSINESS_HOURS_PER_DAY * 60
+    : slaPolicy.resolutionH * 60;
+
+  const slaDueAt = addBusinessMinutes(createdAt, resolutionMinutes, holidayDates);
+
+  return { firstResponseSlaDue, slaDueAt };
+}
+
 export async function calculateSLADeadlines(ticketId: string, tenantId: string): Promise<void> {
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -26,14 +49,11 @@ export async function calculateSLADeadlines(ticketId: string, tenantId: string):
 
   const holidayDates = holidays.map((h) => h.date);
 
-  const firstResponseMinutes = slaPolicy.firstResponseH * 60;
-  const firstResponseSlaDue = addBusinessMinutes(ticket.createdAt, firstResponseMinutes, holidayDates);
-
-  const slaMinutes = slaPolicy.resolutionIsBD
-    ? slaPolicy.resolutionH * BUSINESS_HOURS_PER_DAY * 60
-    : slaPolicy.resolutionH * 60;
-
-  const slaDueAt = addBusinessMinutes(ticket.createdAt, slaMinutes, holidayDates);
+  const { firstResponseSlaDue, slaDueAt } = calculateSLADeadlineValues(
+    ticket.createdAt,
+    slaPolicy,
+    holidayDates,
+  );
 
   await prisma.ticket.update({
     where: { id: ticketId },

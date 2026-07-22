@@ -39,3 +39,9 @@ Ticket durum geçişleri için ayrı bir state-machine modülü oluşturuldu. Ge
 FR-06 SLA tablosunda `high` önceliğin ilk yanıt hedefi 2 saat olarak belirtilirken, FR-06 örneğinde ve FR-08 işletim kurallarında 4 saat olarak belirtilmiştir.
 
 **Karar:** `high` öncelikli ticket'ların ilk yanıt hedefi 4 saat olarak kabul edildi. FR-06 örneği ve kullanıcıya gösterilen işletim kuralı aynı değeri desteklediği için 4 saat esas alındı. AI, çelişkinin tek bir değer etrafında giderilmesini önerdi; uygulama davranışı ile kullanıcıya gösterilen kuralı uyumlu tutan 4 saatlik hedef kabul edildi.
+
+## 2026-07-22 — Deterministik ve Hızlı Seed Üretimi
+
+Seed süresini uzatan ticket başına SLA sorguları kaldırıldı; aynı SLA formülü kullanılarak deadline değerleri `createMany` öncesinde bellekte hesaplanıyor. Kullanıcı hesapları dokümantasyonla uyumlu sabit fixture'lara taşındı, ticket ve yorum çeşitliliği ise `20260722` anahtarlı deterministik üreticiyle korunuyor.
+
+**Karar:** AI, yeni bir seed kütüphanesi eklemek yerine mevcut SLA ve Prisma yapısının yeniden kullanılmasını önerdi; gereksiz bağımlılık yaratmadığı için kabul edildi. Demo ve filtre testleri için her tenant'a Donanım, Yazılım, Ağ, Erişim, E-posta, Güvenlik ve Diğer kategorileri garantili olarak dağıtılıyor.

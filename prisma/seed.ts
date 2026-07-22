@@ -1,20 +1,43 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { calculateSLADeadlines } from '../src/backend/services/sla';
+import { calculateSLADeadlineValues, type SLADeadlinePolicy } from '../src/backend/services/sla';
 
 const prisma = new PrismaClient();
 
 const TENANTS = [
-  { slug: 'acme', name: 'ACME Corp' },
-  { slug: 'globex', name: 'Globex Corporation' },
-  { slug: 'initech', name: 'Initech' },
-  { slug: 'umbrella', name: 'Umbrella Inc' },
-];
+  {
+    slug: 'acme',
+    name: 'ACME Corp',
+    agentCount: 2,
+    customerNames: ['Melis Ay', 'Veli Kurt', 'Kutay Eren', 'Ferit Kaya', 'Umut Ateş'],
+  },
+  {
+    slug: 'globex',
+    name: 'Globex Corporation',
+    agentCount: 4,
+    customerNames: ['Savaş Durmaz', 'Bora İnce', 'Hilal Özkan', 'Ferit Kaya', 'Hüseyin Koç'],
+  },
+  {
+    slug: 'initech',
+    name: 'Initech',
+    agentCount: 4,
+    customerNames: [
+      'Meltem Bozkurt', 'Burak Yılmaz', 'Elif Arslan', 'Caner Taş',
+      'Büşra Özdemir', 'Aslıhan Aktaş', 'Yiğit Koçak', 'Berkay Toprak',
+    ],
+  },
+  {
+    slug: 'umbrella',
+    name: 'Umbrella Inc',
+    agentCount: 3,
+    customerNames: ['Rabia Demirel', 'Bilge Yontar', 'Özge Şeker'],
+  },
+] as const;
 
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 const STATUSES = ['new', 'open', 'pending', 'resolved', 'closed'] as const;
 
-const SLA_CONFIG: Record<string, { firstResponseH: number; resolutionH: number; resolutionIsBD: boolean }> = {
+const SLA_CONFIG: Record<string, SLADeadlinePolicy> = {
   urgent: { firstResponseH: 1, resolutionH: 8, resolutionIsBD: false },
   high: { firstResponseH: 4, resolutionH: 24, resolutionIsBD: false },
   normal: { firstResponseH: 8, resolutionH: 3, resolutionIsBD: true },
@@ -31,52 +54,18 @@ const TURKISH_HOLIDAYS_2026 = [
   { date: '2026-10-29', name: 'Cumhuriyet Bayramı' },
 ];
 
-const CUSTOMER_NAMES = [
-  'Ayşe Yılmaz', 'Mehmet Demir', 'Fatma Şahin', 'Mustafa Çelik',
-  'Zeynep Kaya', 'Ali Öztürk', 'Elif Arslan', 'Hüseyin Koç',
-  'İrem Yıldız', 'Ahmet Polat', 'Selin Aydın', 'Veli Kurt',
-  'Büşra Özdemir', 'Murat Kılıç', 'Gamze Aslan', 'Emre Güneş',
-  'Dilara Çetin', 'İsmail Kaya', 'Merve Yalçın', 'Kaan Yıldırım',
-  'Aslıhan Aktaş', 'Okan Şahin', 'Ceren Bulut', 'Burak Yılmaz',
-  'Esra Karadeniz', 'Umut Ateş', 'Hande Yalçın', 'Caner Taş',
-  'Seda Korkmaz', 'Tolga Eren', 'Pınar Sarı', 'Berkay Toprak',
-  'Gizem Özer', 'Serkan Demirel', 'Ece Dağ', 'Onur Avcı',
-  'Çağla Işık', 'Yiğit Koçak', 'Leyla Tan', 'Oğuzhan Şimşek',
-  'Derya Gündüz', 'Mert Aksoy', 'Nazlı Korkut', 'Fatih Erdoğan',
-  'Tuğba Sağlam', 'Gökhan Kaya', 'Şeyma Yücel', 'Ufuk Baş',
-  'Hilal Özkan', 'Cemal Kaya', 'Rabia Demirel', 'Aykut Çalışkan',
-  'Meltem Bozkurt', 'Bora İnce', 'Nalan Yurt', 'Eren Ünal',
-  'Funda Akyüz', 'Alper Tekin', 'Yasemin Gül', 'Rıza Ekmekçi',
-  'Sevda Kılıç', 'Necdet Yıldız', 'Aylin Sarıkaya', 'Tamer Güçlü',
-  'Işıl Poyraz', 'Berke Can', 'Özge Şeker', 'Kemal Yıldırım',
-  'Bilge Yontar', 'Savaş Durmaz', 'Melis Ay', 'Hayati Öz',
-  'Sibel Boz', 'Kutay Eren', 'Nihan Kılıç', 'Ferit Kaya',
-];
+const CATEGORIES = ['Donanım', 'Yazılım', 'Ağ', 'Erişim', 'E-posta', 'Güvenlik', 'Diğer'] as const;
+type TicketCategory = typeof CATEGORIES[number];
 
-const TICKET_TITLES = [
-  'E-posta hesabı açılamıyor', 'VPN bağlantı sorunu', 'Yazıcı arızası',
-  'Şifre sıfırlama talebi', 'Yazılım lisansı yenileme', 'Bilgisayar yavaş çalışıyor',
-  'Ağ bağlantısı kesiliyor', 'Uygulama hata veriyor', 'Ek donanım talebi',
-  'Kullanıcı hesabı kilitlendi', 'Veri tabanı bağlantı hatası', 'Monitör arızası',
-  'Yedekleme hatası', 'Güvenlik duvarı ayarı', 'Sanal sunucu talebi',
-  'E-posta kotası aşımı', 'Antivirüs güncellemesi', 'Dosya paylaşım izni',
-  'Uzaktan erişim talebi', 'Sistem güncellemesi', 'Klavye arızası',
-  'Fare çalışmıyor', 'Kulaklık sorunu', 'Web kamerası algılanmıyor',
-  'USB port çalışmıyor', 'Ekran kartı sürücüsü', 'Ses kartı sorunu',
-  'Toplantı odası donanımı', 'Projeksiyon bağlantısı', 'Akıllı kart okuyucu',
-  'PowerPoint açılmıyor', 'Excel dosyası bozuldu', 'Outlook profili sıfırlama',
-  'Teams ses sorunu', 'Zoom bağlantı hatası', 'Slack bildirim gelmiyor',
-  'İnternet bağlantısı yavaş', 'Kablosuz ağ düşüyor', 'Erişim izni talebi',
-  'Yeni kullanıcı oluşturma', 'Disk alanı doldu', 'RAM yükseltme talebi',
-  'Sunucu yeniden başlatma', 'Log analizi talebi', 'Güvenlik taraması',
-  'Sertifika yenileme', 'API erişim hatası', 'Web sitesi yayında değil',
-  'DNS çözümleme hatası', 'SSL sertifika uyarısı', 'Yedekten geri yükleme',
-  'Sanal makine kurulumu', 'Depolama genişletme', 'Ağ kablosu arızası',
-  'UPS pil değişimi', 'Soğutma sistemi arızası', 'Kart okuyucu çalışmıyor',
-  'İmza yetkisi talebi', 'Rapor oluşturma talebi', 'Veri analizi talebi',
-  'Mobil cihaz kaydı', 'İki faktörlü kimlik doğrulama', 'E-posta imzası talebi',
-  'Takvim paylaşımı', 'Görev ataması sorunu', 'Dosya kurtarma talebi',
-];
+const CATEGORY_SUBJECTS: Record<TicketCategory, readonly string[]> = {
+  'Donanım': ['Yazıcı', 'Monitör', 'Klavye', 'Fare', 'Web kamerası', 'Disk', 'RAM', 'Projeksiyon'],
+  'Yazılım': ['PowerPoint', 'Excel', 'Teams', 'Zoom', 'Slack', 'Muhasebe uygulaması', 'Tarayıcı'],
+  'Ağ': ['VPN bağlantısı', 'Kablosuz ağ', 'DNS kaydı', 'DHCP havuzu', 'Proxy ayarları', 'Ağ sürücüsü'],
+  'Erişim': ['Kullanıcı hesabı', 'Dosya paylaşım izni', 'Uzaktan erişim', 'Yetki grubu', 'Akıllı kart'],
+  'E-posta': ['E-posta hesabı', 'Outlook profili', 'E-posta kotası', 'E-posta imzası', 'Takvim paylaşımı'],
+  'Güvenlik': ['Antivirüs yazılımı', 'Güvenlik duvarı', 'SSL sertifikası', 'İki faktörlü doğrulama', 'Güvenlik taraması'],
+  'Diğer': ['Yedekleme servisi', 'Sanal makine', 'Raporlama servisi', 'Depolama alanı', 'Sunucu servisi'],
+};
 
 const VERBS = [
   'açılamıyor', 'çalışmıyor', 'hata veriyor', 'bağlanamıyor',
@@ -84,70 +73,110 @@ const VERBS = [
   'performans sorunu', 'yapılandırma hatası', 'uyum sorunu',
 ];
 
-const NOUNS = [
-  'E-posta istemcisi', 'VPN bağlantısı', 'Ağ sürücüsü', 'Yazıcı',
-  'Tarayıcı', 'Sunucu servisi', 'Sanal makine', 'Veritabanı',
-  'Web sunucusu', 'Güvenlik duvarı', 'Proxy ayarları', 'DNS kaydı',
-  'DHCP havuzu', 'Yedekleme ajanı', 'Antivirüs yazılımı', 'Sanal özel ağ',
-  'Uzaktan masaüstü', 'Dosya sunucusu', 'E-posta kuyruğu', 'Oturum yöneticisi',
-];
+const RANDOM_SEED = 20260722;
+const TICKETS_PER_TENANT = 25000;
+const COMMENTS_PER_TENANT = 100000;
+let randomState = RANDOM_SEED;
+
+function nextRandom(): number {
+  randomState = (randomState + 0x6D2B79F5) | 0;
+  let value = randomState;
+  value = Math.imul(value ^ (value >>> 15), value | 1);
+  value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+  return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+}
 
 function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  return Math.floor(nextRandom() * (max - min + 1)) + min;
 }
 
 function randomItem<T>(arr: readonly T[] | T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function shuffle<T>(arr: readonly T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
+  return arr[Math.floor(nextRandom() * arr.length)];
 }
 
 function randomDate(start: Date, end: Date): Date {
-  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+  return new Date(start.getTime() + nextRandom() * (end.getTime() - start.getTime()));
 }
 
-function generateTitle(): string {
-  if (Math.random() > 0.3) {
-    const verb = randomItem(VERBS);
-    const noun = randomItem(NOUNS);
-    return `${noun} ${verb}`;
+function generateTitle(category = randomItem(CATEGORIES)): string {
+  const subject = randomItem(CATEGORY_SUBJECTS[category]);
+  return `${subject} ${randomItem(VERBS)}`;
+}
+
+async function validateSeed(): Promise<void> {
+  const expectedUserCount = TENANTS.reduce(
+    (total, tenant) => total + 1 + tenant.agentCount + tenant.customerNames.length,
+    0,
+  );
+  const expectedTicketCount = TENANTS.length * TICKETS_PER_TENANT;
+  const expectedCommentCount = TENANTS.length * COMMENTS_PER_TENANT;
+
+  const [userCount, ticketCount, commentCount, uncategorizedCount, missingSlaCount, categoryGroups] = await Promise.all([
+    prisma.user.count(),
+    prisma.ticket.count(),
+    prisma.comment.count(),
+    prisma.ticket.count({ where: { category: null } }),
+    prisma.ticket.count({
+      where: {
+        OR: [
+          { firstResponseSlaDue: null },
+          { slaDueAt: null },
+        ],
+      },
+    }),
+    prisma.ticket.groupBy({ by: ['category'] }),
+  ]);
+
+  const actualCategories = new Set(categoryGroups.map((group) => group.category));
+  const missingCategories = CATEGORIES.filter((category) => !actualCategories.has(category));
+
+  const errors = [
+    userCount === expectedUserCount ? null : `Kullanıcı sayısı ${userCount}; beklenen ${expectedUserCount}`,
+    ticketCount === expectedTicketCount ? null : `Ticket sayısı ${ticketCount}; beklenen ${expectedTicketCount}`,
+    commentCount === expectedCommentCount ? null : `Yorum sayısı ${commentCount}; beklenen ${expectedCommentCount}`,
+    uncategorizedCount === 0 ? null : `${uncategorizedCount} ticket kategorisiz`,
+    missingSlaCount === 0 ? null : `${missingSlaCount} ticket'ın SLA tarihi eksik`,
+    missingCategories.length === 0 ? null : `Eksik kategoriler: ${missingCategories.join(', ')}`,
+  ].filter((error): error is string => error !== null);
+
+  if (errors.length > 0) {
+    throw new Error(`Seed doğrulaması başarısız:\n- ${errors.join('\n- ')}`);
   }
-  return randomItem(TICKET_TITLES);
+
+  console.log(`  Doğrulandı: ${userCount} kullanıcı, ${ticketCount} ticket, ${commentCount} yorum, ${CATEGORIES.length} kategori.`);
 }
 
 async function main() {
   console.log('Seed başlıyor...');
+  console.log(`  Deterministik veri anahtarı: ${RANDOM_SEED}`);
+
+  const passwordHash = bcrypt.hashSync('123456', 10);
+  const holidayDates = TURKISH_HOLIDAYS_2026.map((holiday) => new Date(holiday.date));
 
   for (const tenantData of TENANTS) {
     console.log(`  Tenant oluşturuluyor: ${tenantData.name}`);
 
-    const tenant = await prisma.tenant.create({ data: tenantData });
+    const tenant = await prisma.tenant.create({
+      data: { slug: tenantData.slug, name: tenantData.name },
+    });
 
     await prisma.user.create({
       data: {
         tenantId: tenant.id,
         email: `admin@${tenantData.slug}.com`,
-        password: bcrypt.hashSync('123456', 10),
+        password: passwordHash,
         name: `${tenantData.name} Admin`,
         role: 'admin',
       },
     });
 
-    const agentCount = randomInt(2, 4);
     const agents: string[] = [];
-    for (let i = 1; i <= agentCount; i++) {
+    for (let i = 1; i <= tenantData.agentCount; i++) {
       const user = await prisma.user.create({
         data: {
           tenantId: tenant.id,
           email: `agent${i}@${tenantData.slug}.com`,
-          password: bcrypt.hashSync('123456', 10),
+          password: passwordHash,
           name: `${tenantData.name} Ajan ${i}`,
           role: 'agent',
         },
@@ -155,16 +184,14 @@ async function main() {
       agents.push(user.id);
     }
 
-    const customerCount = randomInt(3, 8);
     const customers: string[] = [];
-    const shuffledNames = shuffle(CUSTOMER_NAMES);
-    for (let i = 0; i < customerCount; i++) {
-      const name = shuffledNames[i % shuffledNames.length];
+    for (let i = 0; i < tenantData.customerNames.length; i++) {
+      const name = tenantData.customerNames[i];
       const user = await prisma.user.create({
         data: {
           tenantId: tenant.id,
           email: `musteri${i + 1}@${tenantData.slug}.com`,
-          password: bcrypt.hashSync('123456', 10),
+          password: passwordHash,
           name,
           role: 'customer',
         },
@@ -194,7 +221,7 @@ async function main() {
       });
     }
 
-    const ticketCount = 25000;
+    const ticketCount = TICKETS_PER_TENANT;
     console.log(`  ${ticketCount} ticket oluşturuluyor...`);
 
     const batchSize = 1000;
@@ -205,25 +232,31 @@ async function main() {
       const tickets = [];
 
       for (let i = 0; i < size; i++) {
+        const number = ticketNumber++;
         const status = randomItem(STATUSES);
         const priority = randomItem(PRIORITIES);
+        const category = CATEGORIES[(number - 1) % CATEGORIES.length];
         const customerId = randomItem(customers);
         const assignedToId = ['open', 'pending', 'resolved', 'closed'].includes(status)
           ? randomItem(agents)
           : null;
         const createdAt = randomDate(new Date('2025-01-01'), new Date('2026-06-01'));
-        const title = generateTitle();
+        const title = generateTitle(category);
+        const deadlines = calculateSLADeadlineValues(createdAt, SLA_CONFIG[priority], holidayDates);
 
         tickets.push({
           tenantId: tenant.id,
-          number: ticketNumber++,
-          displayId: `${tenantData.slug.toUpperCase()}-${ticketNumber - 1}`,
+          number,
+          displayId: `${tenantData.slug.toUpperCase()}-${number}`,
           title,
           description: `${title} ile ilgili detaylı açıklama. Sorun giderme adımları denendi ancak çözülemedi.`,
           status,
           priority,
+          category,
           customerId,
           assignedToId,
+          firstResponseSlaDue: deadlines.firstResponseSlaDue,
+          slaDueAt: deadlines.slaDueAt,
           createdAt,
           updatedAt: createdAt,
         });
@@ -235,16 +268,10 @@ async function main() {
     const allTickets = await prisma.ticket.findMany({
       where: { tenantId: tenant.id },
       select: { id: true, customerId: true, assignedToId: true, status: true, createdAt: true },
+      orderBy: { number: 'asc' },
     });
 
-    console.log(`  SLA deadline'lar hesaplanıyor...`);
-    const slaBatch = 500;
-    for (let i = 0; i < allTickets.length; i += slaBatch) {
-      const batch = allTickets.slice(i, i + slaBatch);
-      await Promise.all(batch.map((t) => calculateSLADeadlines(t.id, tenant.id).catch(() => {})));
-    }
-
-    const commentCount = 100000;
+    const commentCount = COMMENTS_PER_TENANT;
     console.log(`  ${commentCount} yorum oluşturuluyor...`);
 
     for (let batch = 0; batch < commentCount; batch += batchSize) {
@@ -253,8 +280,8 @@ async function main() {
 
       for (let i = 0; i < size; i++) {
         const ticket = randomItem(allTickets);
-        const isAgent = Math.random() > 0.5;
-        const isInternal = isAgent && Math.random() > 0.7;
+        const isAgent = nextRandom() > 0.5;
+        const isInternal = isAgent && nextRandom() > 0.7;
         const authorId = isAgent
           ? randomItem(agents)
           : ticket.customerId;
@@ -282,6 +309,7 @@ async function main() {
     console.log(`  ${tenantData.name} tamamlandı.`);
   }
 
+  await validateSeed();
   console.log('Seed tamamlandı!');
 }
 

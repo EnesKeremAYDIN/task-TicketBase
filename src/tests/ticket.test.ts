@@ -108,6 +108,30 @@ describe('Ticket CRUD', () => {
     expect(body.priority).toBe('high');
   });
 
+  it('kategoriyle ticket oluşturulabilmeli ve kategoriye göre filtrelenebilmeli', async () => {
+    const title = `Kategori filtre testi ${Date.now()}`;
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/tickets',
+      headers: { authorization: `Bearer ${customerToken}` },
+      payload: { title, description: 'Ağ kategorisi testi', category: 'Ağ' },
+    });
+
+    expect(createResponse.statusCode).toBe(201);
+    expect(JSON.parse(createResponse.body).category).toBe('Ağ');
+
+    const listResponse = await app.inject({
+      method: 'GET',
+      url: `/api/tickets?category=${encodeURIComponent('Ağ')}&search=${encodeURIComponent(title)}`,
+      headers: { authorization: `Bearer ${agentToken}` },
+    });
+
+    expect(listResponse.statusCode).toBe(200);
+    const body = JSON.parse(listResponse.body);
+    expect(body.total).toBe(1);
+    expect(body.tickets[0].category).toBe('Ağ');
+  });
+
   it('ticket numarası ardışık olmalı', async () => {
     const res1 = await app.inject({
       method: 'POST',

@@ -11,6 +11,7 @@ import { slaRoutes } from '../backend/routes/sla';
 import { inboundEmailRoutes } from '../backend/routes/inbound-email';
 import { AppError } from '../backend/lib/errors';
 import { addBusinessMinutes, nextBusinessMinute } from '../backend/lib/business-hours';
+import { calculateSLADeadlineValues } from '../backend/services/sla';
 import prisma from '../backend/lib/prisma';
 
 async function buildApp() {
@@ -83,6 +84,18 @@ describe('Business Hours Calculator', () => {
     expect(result.getUTCDay()).toBe(1);
     expect(result.getUTCDate()).toBe(5);
     expect(result.getUTCHours()).toBe(6);
+  });
+
+  it('SLA tarihlerini veritabanı sorgusu olmadan hesaplamalı', () => {
+    const createdAt = new Date(Date.UTC(2026, 0, 5, 7, 0, 0));
+    const result = calculateSLADeadlineValues(
+      createdAt,
+      { firstResponseH: 4, resolutionH: 24, resolutionIsBD: false },
+      holidays,
+    );
+
+    expect(result.firstResponseSlaDue).toEqual(new Date(Date.UTC(2026, 0, 5, 11, 0, 0)));
+    expect(result.slaDueAt).toEqual(new Date(Date.UTC(2026, 0, 7, 13, 0, 0)));
   });
 });
 

@@ -137,38 +137,41 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 ## Seed Verisi
 
 - **4 tenant**: ACME Corp, Globex Corporation, Initech, Umbrella Inc
-- **~20-30 kullanıcı**: 4 admin + ~12 agent + ~20 müşteri
-- **100.000 ticket**: Tenant başına 25.000, rastgele durum/öncelik
-- **400.000 yorum**: Tenant başına 100.000
-- **SLA deadline'lar**: Tüm ticket'lar için hesaplanmış
+- **38 sabit kullanıcı**: 4 admin + 13 agent + 21 müşteri
+- **100.000 ticket**: Tenant başına 25.000; durum, öncelik ve kategori dağılımı deterministik
+- **400.000 yorum**: Tenant başına 100.000; dağılımı deterministik
+- **7 kategori**: Donanım, Yazılım, Ağ, Erişim, E-posta, Güvenlik, Diğer
+- **SLA deadline'ları**: Veritabanına yazılmadan önce bellekte hesaplanır
+- **Tekrarlanabilir sonuç**: Seed anahtarı `20260722`; aynı komut aynı kullanıcıları ve içerik dağılımını üretir
+- **Ölçülen `db:reset` süresi**: 65–85 saniye (iki yerel doğrulama çalışması)
 
 ## Test Sonuçları
 
-### Birim Testleri (`npm test`) — 63/63 ✅
+### Birim Testleri (`npm test`) — 65/65 ✅
 
 ```
 Test Files  5 passed (5)
-     Tests  60 passed (60)
+     Tests  65 passed (65)
 ```
 
 | Test Dosyası | Test Sayısı | Kapsam |
 |-------------|-------------|--------|
 | auth.test.ts | 10 | Login, token doğrulama, middleware |
-| ticket.test.ts | 15 | CRUD, müşteri liste izolasyonu, yorum görünürlüğü, state machine, sequential number, claim/assign |
-| sla.test.ts | 14 | Business hours, SLA policy, comments, dashboard |
+| ticket.test.ts | 16 | CRUD, kategori filtresi, müşteri liste izolasyonu, yorum görünürlüğü, state machine, sequential number, claim/assign |
+| sla.test.ts | 15 | Business hours, sorgusuz SLA hesabı, SLA policy, comments, dashboard |
 | inbound-email.test.ts | 8 | Webhook, duplicate, validation |
 | extended.test.ts | 16 | Cross-tenant, race, pagination, SLA boundary, search |
 
 ### Performans (`npm run perf`)
 ```
 Ticket Listesi:
-   Ortalama: 3.3ms
-   P95: 4ms
+   Ortalama: 3.6ms
+   P95: 5ms
    Durum: ✅ BAŞARILI (<300ms)
 
 Dashboard:
-   Ortalama: 59.0ms
-   P95: 79ms
+   Ortalama: 46.9ms
+   P95: 73ms
    Durum: ✅ BAŞARILI (<500ms)
 ```
 

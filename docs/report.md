@@ -52,7 +52,7 @@ Durumlar: `new → open → pending → resolved → closed`
 | İstek | Uygulama |
 |-------|----------|
 | E-posta + şifre girişi | `POST /api/auth/login` → `services/auth.ts:loginUser()` |
-| Seed kullanıcılarıyla | 4 admin, ~12 agent, ~20 müşteri (şifre: 123456) |
+| Seed kullanıcılarıyla | 4 admin, 13 agent, 21 müşteri (şifre: 123456) |
 | JWT ile session | `@fastify/jwt`, 7 gün expiry, `tenantId` + `role` payload'da |
 | Tenant izolasyonu | Tüm sorgularda `tenantId` WHERE clause, `isolation-test` 8/8 |
 
@@ -115,7 +115,7 @@ Durumlar: `new → open → pending → resolved → closed`
 | Sayfalama | `skip/take`, parametrik `page` + `limit` |
 | Son yorum önizlemesi | Ayrı `findMany` + `distinct['ticketId']` ile |
 | Dashboard (durum/öncelik/SLA/agent iş yükü) | `getDashboardStats()` → 4 paralel aggregate |
-| Akıcı çalışma (100k) | P95: list 4ms, dashboard 83ms |
+| Akıcı çalışma (100k) | P95: list 5ms, dashboard 73ms |
 
 ### FR-08 — İşletim Kuralları Ekranı
 
@@ -142,8 +142,8 @@ Durumlar: `new → open → pending → resolved → closed`
 
 | İstek | Limit | Gerçek | Durum |
 |-------|-------|--------|-------|
-| Ticket listesi p95 | <300ms | **4ms** | ✅ |
-| Dashboard p95 | <500ms | **83ms** | ✅ |
+| Ticket listesi p95 | <300ms | **5ms** | ✅ |
+| Dashboard p95 | <500ms | **73ms** | ✅ |
 | `npm run perf` script'i | — | Mevcut | ✅ |
 
 ### NFR-02 — Eşzamanlılık
@@ -169,7 +169,7 @@ Durumlar: `new → open → pending → resolved → closed`
 |-------|-------|
 | TypeScript strict: true | ✅ `tsconfig.json`'da tanımlı |
 | any kullanımı gerekçelendirilmeli | ✅ Minimal, tip dönüşümleri `as` ile |
-| Birim testleri | ✅ **61 test** (state machine, numbering, SLA, webhook, visibility) |
+| Birim testleri | ✅ **65 test** (state machine, numbering, SLA, kategori, webhook, visibility) |
 | Lint temiz | ✅ `npm run lint` 0 hata |
 
 ### NFR-05 — Zaman Yönetimi
@@ -210,10 +210,10 @@ Durumlar: `new → open → pending → resolved → closed`
 | Test | Sonuç |
 |------|-------|
 | `npm run lint` | ✅ **0 hata** |
-| `npm test` | ✅ **63/63 geçti** (5 dosya) |
+| `npm test` | ✅ **65/65 geçti** (5 dosya) |
 | `npm run race-test` | ✅ 20/20 benzersiz, 1/10 claim |
 | `npm run isolation-test` | ✅ 9/9 sıfır sızıntı |
-| `npm run perf` | ✅ Liste P95: **5ms**, Dashboard P95: **83ms** |
+| `npm run perf` | ✅ Liste P95: **5ms**, Dashboard P95: **73ms** |
 
 ---
 
