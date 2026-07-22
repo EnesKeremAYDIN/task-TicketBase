@@ -21,7 +21,7 @@ Spec'te belirtildiği gibi, Zammad/Jira benzeri multi-tenant IT destek/ticket si
 | AGENTS.md bağlayıcı | ✅ | Tüm kod yazımında AGENTS.md kuralları takip edildi |
 | Commit disiplini | ✅ | 20 küçük mantıksal commit, squash yok |
 | DECISIONS.md | ✅ | Tüm teknik kararlar kaydedildi |
-| AI transkriptleri | ✅ | `/ai-transcripts/` klasöründe (teslim sırasında eklenecek) |
+| AI transkriptleri | ✅ | `/ai-transcripts/` klasöründe |
 | QUESTIONS.md | ✅ | Boş bırakıldı (soru ihtiyacı oluşmadı) |
 
 ---
@@ -102,7 +102,7 @@ Durumlar: `new → open → pending → resolved → closed`
 | İlk yanıt + çözüm deadlines | `calculateSLADeadlines()` → `addBusinessMinutes()` |
 | Mesai saatleri 09:00-18:00 | `business-hours.ts` → UTC+3, WORK_START:6, WORK_END:15 |
 | Hafta sonu + tatil | `isWeekend()` + `isHoliday()` (seed'de 7 tatil/tenant) |
-| SLA hedef tablosu | `SLAPolicy` seed: urgent(1s/8s), high(2s/24s), normal(8s/3gün), low(24s/5gün) |
+| SLA hedef tablosu | `SLAPolicy` seed: urgent(1s/8s), high(4s/24s), normal(8s/3gün), low(24s/5gün) |
 | breached işaretleme | `markBreachedTickets()` → periyodik + dashboard'da |
 | Spec örneği doğrulandı | "Cuma 17:00 → Pazartesi 12:00" test edildi (sla.test.ts) |
 
@@ -115,7 +115,7 @@ Durumlar: `new → open → pending → resolved → closed`
 | Sayfalama | `skip/take`, parametrik `page` + `limit` |
 | Son yorum önizlemesi | Ayrı `findMany` + `distinct['ticketId']` ile |
 | Dashboard (durum/öncelik/SLA/agent iş yükü) | `getDashboardStats()` → 4 paralel aggregate |
-| Akıcı çalışma (100k) | P95: list 4ms, dashboard 97ms |
+| Akıcı çalışma (100k) | P95: list 4ms, dashboard 83ms |
 
 ### FR-08 — İşletim Kuralları Ekranı
 
@@ -143,7 +143,7 @@ Durumlar: `new → open → pending → resolved → closed`
 | İstek | Limit | Gerçek | Durum |
 |-------|-------|--------|-------|
 | Ticket listesi p95 | <300ms | **4ms** | ✅ |
-| Dashboard p95 | <500ms | **97ms** | ✅ |
+| Dashboard p95 | <500ms | **83ms** | ✅ |
 | `npm run perf` script'i | — | Mevcut | ✅ |
 
 ### NFR-02 — Eşzamanlılık
@@ -169,7 +169,7 @@ Durumlar: `new → open → pending → resolved → closed`
 |-------|-------|
 | TypeScript strict: true | ✅ `tsconfig.json`'da tanımlı |
 | any kullanımı gerekçelendirilmeli | ✅ Minimal, tip dönüşümleri `as` ile |
-| Birim testleri | ✅ **60 test** (state machine, numbering, SLA, webhook, visibility) |
+| Birim testleri | ✅ **61 test** (state machine, numbering, SLA, webhook, visibility) |
 | Lint temiz | ✅ `npm run lint` 0 hata |
 
 ### NFR-05 — Zaman Yönetimi
@@ -200,8 +200,8 @@ Durumlar: `new → open → pending → resolved → closed`
 | 1 | Git repo (tüm commit geçmişiyle, squash yok) | ✅ **20 commit** |
 | 2 | README.md (kurulum, çalıştırma, test sonuçları) | ✅ Güncellendi |
 | 3 | DECISIONS.md + QUESTIONS.md | ✅ Mevcut |
-| 4 | AI transkriptleri | ✅ `/ai-transcripts/` klasöründe (teslim sırasında eklenecek) |
-| 5 | Demo videosu (opsiyonel) | ✅ Teslim sırasında eklenecek |
+| 4 | AI transkriptleri | ✅ `/ai-transcripts/` klasöründe |
+| 5 | Demo videosu (opsiyonel) | X |
 
 ---
 
@@ -210,10 +210,10 @@ Durumlar: `new → open → pending → resolved → closed`
 | Test | Sonuç |
 |------|-------|
 | `npm run lint` | ✅ **0 hata** |
-| `npm test` | ✅ **60/60 geçti** (5 dosya) |
+| `npm test` | ✅ **61/61 geçti** (5 dosya) |
 | `npm run race-test` | ✅ 20/20 benzersiz, 1/10 claim |
 | `npm run isolation-test` | ✅ 8/8 sıfır sızıntı |
-| `npm run perf` | ✅ Liste P95: **4ms**, Dashboard P95: **97ms** |
+| `npm run perf` | ✅ Liste P95: **4ms**, Dashboard P95: **83ms** |
 
 ---
 

@@ -33,3 +33,9 @@ Ticket numaralarının race condition olmadan üretilmesi için ayrı bir Ticket
 ## 2026-07-16 — State Machine Tasarımı
 
 Ticket durum geçişleri için ayrı bir state-machine modülü oluşturuldu. Geçerli geçişler: new→open→pending→resolved→closed. Her geçiş route'da validate ediliyor. Müşteri sadece kendi ticket'ını görebiliyor, agent/admin tüm ticket'ları görüyor. Customer ticket listesini göremiyor (sadece detay).
+
+## 2026-07-22 — `high` İlk Yanıt SLA Hedefi
+
+FR-06 SLA tablosunda `high` önceliğin ilk yanıt hedefi 2 saat olarak belirtilirken, FR-06 örneğinde ve FR-08 işletim kurallarında 4 saat olarak belirtilmiştir.
+
+**Karar:** `high` öncelikli ticket'ların ilk yanıt hedefi 4 saat olarak kabul edildi. FR-06 örneği ve kullanıcıya gösterilen işletim kuralı aynı değeri desteklediği için 4 saat esas alındı. AI, çelişkinin tek bir değer etrafında giderilmesini önerdi; uygulama davranışı ile kullanıcıya gösterilen kuralı uyumlu tutan 4 saatlik hedef kabul edildi.

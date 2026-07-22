@@ -89,7 +89,7 @@
 | Öncelik | İlk Yanıt | Çözüm |
 |---|---|---|
 | urgent | 1 saat | 8 saat |
-| high | 2 saat | 24 saat |
+| high | 4 saat | 24 saat |
 | normal | 8 saat | 3 iş günü |
 | low | 24 saat | 5 iş günü |
 

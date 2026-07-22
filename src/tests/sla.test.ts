@@ -11,6 +11,7 @@ import { slaRoutes } from '../backend/routes/sla';
 import { inboundEmailRoutes } from '../backend/routes/inbound-email';
 import { AppError } from '../backend/lib/errors';
 import { addBusinessMinutes, nextBusinessMinute } from '../backend/lib/business-hours';
+import prisma from '../backend/lib/prisma';
 
 async function buildApp() {
   const app = Fastify({ logger: false });
@@ -235,6 +236,19 @@ describe('SLA Dashboard', () => {
     expect(body.statusBreakdown).toBeDefined();
     expect(body.priorityBreakdown).toBeDefined();
     expect(body.slaBreached).toBeDefined();
+  });
+
+  it('high önceliğin ilk yanıt hedefi 4 saat olmalı', async () => {
+    const policy = await prisma.sLAPolicy.findFirst({
+      where: {
+        priority: 'high',
+        tenant: { slug: 'acme' },
+      },
+    });
+
+    expect(policy).not.toBeNull();
+    expect(policy?.firstResponseH).toBe(4);
+    expect(policy?.resolutionH).toBe(24);
   });
 
   it('SLA breach listesi dönmeli', async () => {

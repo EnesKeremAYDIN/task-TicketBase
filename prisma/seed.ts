@@ -16,7 +16,7 @@ const STATUSES = ['new', 'open', 'pending', 'resolved', 'closed'] as const;
 
 const SLA_CONFIG: Record<string, { firstResponseH: number; resolutionH: number; resolutionIsBD: boolean }> = {
   urgent: { firstResponseH: 1, resolutionH: 8, resolutionIsBD: false },
-  high: { firstResponseH: 2, resolutionH: 24, resolutionIsBD: false },
+  high: { firstResponseH: 4, resolutionH: 24, resolutionIsBD: false },
   normal: { firstResponseH: 8, resolutionH: 3, resolutionIsBD: true },
   low: { firstResponseH: 24, resolutionH: 5, resolutionIsBD: true },
 };

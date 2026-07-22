@@ -69,7 +69,7 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
 - [ ] Business hour calculator: hafta içi 09:00-18:00, `Europe/Istanbul`
 - [ ] Tatil tablosu entegrasyonu (seed'deki holiday verisiyle)
 - [ ] SLA deadline hesaplama (ilk yanıt + çözüm) — yaz saati geçişleri dahil
-- [ ] SLA hedefleri: urgent(1s/8s), high(2s/24s), normal(8s/3gün), low(24s/5gün)
+- [ ] SLA hedefleri: urgent(1s/8s), high(4s/24s), normal(8s/3gün), low(24s/5gün)
 - [ ] `sla_breached` işaretleme mekanizması
 - [ ] İlk `public_reply` SLA ilk yanıt süresini durdurma
 

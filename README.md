@@ -144,7 +144,7 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 
 ## Test Sonuçları
 
-### Birim Testleri (`npm test`) — 60/60 ✅
+### Birim Testleri (`npm test`) — 61/61 ✅
 
 ```
 Test Files  5 passed (5)
@@ -155,7 +155,7 @@ Test Files  5 passed (5)
 |-------------|-------------|--------|
 | auth.test.ts | 10 | Login, token doğrulama, middleware |
 | ticket.test.ts | 13 | CRUD, state machine, sequential number, claim/assign |
-| sla.test.ts | 13 | Business hours, comments, dashboard |
+| sla.test.ts | 14 | Business hours, SLA policy, comments, dashboard |
 | inbound-email.test.ts | 8 | Webhook, duplicate, validation |
 | extended.test.ts | 16 | Cross-tenant, race, pagination, SLA boundary, search |
 
