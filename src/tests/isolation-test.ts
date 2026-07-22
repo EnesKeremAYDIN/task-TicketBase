@@ -41,7 +41,7 @@ async function loginAs(app: ReturnType<typeof Fastify>, email: string) {
     url: '/api/auth/login',
     payload: { email, password: '123456' },
   });
-  return JSON.parse(res.body).token;
+  return JSON.parse(res.body) as { token: string; user: { id: string } };
 }
 
 async function main() {
@@ -49,9 +49,12 @@ async function main() {
 
   const app = await buildApp();
 
-  const acmeToken = await loginAs(app, 'agent1@acme.com');
-  const globexToken = await loginAs(app, 'agent1@globex.com');
-  const customerToken = await loginAs(app, 'musteri1@acme.com');
+  const acmeLogin = await loginAs(app, 'agent1@acme.com');
+  const globexLogin = await loginAs(app, 'agent1@globex.com');
+  const customerLogin = await loginAs(app, 'musteri1@acme.com');
+  const acmeToken = acmeLogin.token;
+  const globexToken = globexLogin.token;
+  const customerToken = customerLogin.token;
 
   let failed = 0;
   let passed = 0;
@@ -60,6 +63,11 @@ async function main() {
     const ok = status === expected;
     console.log(`   ${ok ? '✅' : '❌'} ${label}: beklenen ${expected}, alınan ${status}`);
     if (ok) passed++; else failed++;
+  }
+
+  function checkCondition(label: string, condition: boolean) {
+    console.log(`   ${condition ? '✅' : '❌'} ${label}`);
+    if (condition) passed++; else failed++;
   }
 
   console.log('1. Çapraz tenant erişim:\n');
@@ -106,7 +114,12 @@ async function main() {
     url: '/api/tickets',
     headers: { authorization: `Bearer ${customerToken}` },
   });
-  check('Müşteri ticket listesi (403 olmalı)', customerListAccess.statusCode, 403);
+  check('Müşteri kendi ticket listesini görebilmeli', customerListAccess.statusCode, 200);
+  const customerTickets = JSON.parse(customerListAccess.body).tickets || [];
+  checkCondition(
+    'Müşteri listesinde yalnızca kendi ticketları bulunmalı',
+    customerTickets.every((ticket: { customerId: string }) => ticket.customerId === customerLogin.user.id),
+  );
 
   const dashboardAccess = await app.inject({
     method: 'GET',

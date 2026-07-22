@@ -40,7 +40,7 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/api/tickets', async (request, _reply) => {
-    const user = requireRole(request, ['agent', 'admin']);
+    const user = requireRole(request, ['customer', 'agent', 'admin']);
     const query = request.query as Record<string, string>;
 
     const page = Math.max(1, parseInt(query.page || '1'));
@@ -48,6 +48,7 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
 
     const result = await listTickets({
       tenantId: user.tenantId,
+      customerId: user.role === 'customer' ? user.id : undefined,
       status: query.status,
       priority: query.priority,
       assignedToId: query.assignedToId,

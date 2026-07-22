@@ -210,10 +210,10 @@ Durumlar: `new → open → pending → resolved → closed`
 | Test | Sonuç |
 |------|-------|
 | `npm run lint` | ✅ **0 hata** |
-| `npm test` | ✅ **61/61 geçti** (5 dosya) |
+| `npm test` | ✅ **63/63 geçti** (5 dosya) |
 | `npm run race-test` | ✅ 20/20 benzersiz, 1/10 claim |
-| `npm run isolation-test` | ✅ 8/8 sıfır sızıntı |
-| `npm run perf` | ✅ Liste P95: **4ms**, Dashboard P95: **83ms** |
+| `npm run isolation-test` | ✅ 9/9 sıfır sızıntı |
+| `npm run perf` | ✅ Liste P95: **5ms**, Dashboard P95: **83ms** |
 
 ---
 

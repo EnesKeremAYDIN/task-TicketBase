@@ -7,6 +7,7 @@ import { tenantMiddleware } from '../backend/middleware/tenant';
 import { authRoutes } from '../backend/routes/auth';
 import { ticketRoutes } from '../backend/routes/ticket';
 import { AppError } from '../backend/lib/errors';
+import prisma from '../backend/lib/prisma';
 
 async function buildApp() {
   const app = Fastify({ logger: false });
@@ -142,14 +143,93 @@ describe('Ticket CRUD', () => {
     expect(body.tickets.length).toBeLessThanOrEqual(5);
   });
 
-  it('müşteri ticket listesini görememeli', async () => {
+  it('müşteri yalnızca kendi ticket listesini görebilmeli', async () => {
     const response = await app.inject({
       method: 'GET',
-      url: '/api/tickets',
+      url: '/api/tickets?page=1&limit=100',
       headers: { authorization: `Bearer ${customerToken}` },
     });
 
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.total).toBeGreaterThan(0);
+    expect(body.tickets.every((ticket: { customerId: string }) => ticket.customerId === customerId)).toBe(true);
+  });
+
+  it('müşteri aynı tenant içindeki başka müşterinin ticketını listede görememeli', async () => {
+    const secondCustomerLogin = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: 'musteri2@acme.com', password: '123456' },
+    });
+    const secondCustomerToken = JSON.parse(secondCustomerLogin.body).token;
+    const uniqueTitle = `Başka müşteriye ait ${Date.now()}`;
+
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/tickets',
+      headers: { authorization: `Bearer ${secondCustomerToken}` },
+      payload: { title: uniqueTitle, description: 'Yalnızca ikinci müşteri görebilir' },
+    });
+    expect(createResponse.statusCode).toBe(201);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/tickets?search=${encodeURIComponent(uniqueTitle)}`,
+      headers: { authorization: `Bearer ${customerToken}` },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.total).toBe(0);
+    expect(body.tickets).toHaveLength(0);
+  });
+
+  it('müşteri ticket listesinde iç not yerine son genel yanıtı görmeli', async () => {
+    const uniqueTitle = `Yorum görünürlüğü ${Date.now()}`;
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/tickets',
+      headers: { authorization: `Bearer ${customerToken}` },
+      payload: { title: uniqueTitle, description: 'Yorum görünürlüğü testi' },
+    });
+    const ticketId = JSON.parse(createResponse.body).id;
+    const now = Date.now();
+
+    await prisma.comment.createMany({
+      data: [
+        {
+          ticketId,
+          authorId: agentId,
+          type: 'public_reply',
+          body: 'Müşterinin görebileceği yanıt',
+          createdAt: new Date(now - 1000),
+        },
+        {
+          ticketId,
+          authorId: agentId,
+          type: 'internal_note',
+          body: 'Müşteriden gizli iç not',
+          createdAt: new Date(now),
+        },
+      ],
+    });
+
+    const customerResponse = await app.inject({
+      method: 'GET',
+      url: `/api/tickets?search=${encodeURIComponent(uniqueTitle)}`,
+      headers: { authorization: `Bearer ${customerToken}` },
+    });
+    const customerTicket = JSON.parse(customerResponse.body).tickets[0];
+    expect(customerTicket.lastComment.body).toBe('Müşterinin görebileceği yanıt');
+
+    const agentResponse = await app.inject({
+      method: 'GET',
+      url: `/api/tickets?search=${encodeURIComponent(uniqueTitle)}`,
+      headers: { authorization: `Bearer ${agentToken}` },
+    });
+    const agentTicket = JSON.parse(agentResponse.body).tickets[0];
+    expect(agentTicket.lastComment.body).toBe('Müşteriden gizli iç not');
   });
 
   it('ticket detayı görüntülenebilmeli', async () => {

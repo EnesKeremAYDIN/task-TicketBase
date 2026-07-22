@@ -13,6 +13,7 @@ interface CreateTicketData {
 
 interface ListTicketsParams {
   tenantId: string;
+  customerId?: string;
   status?: string;
   priority?: string;
   assignedToId?: string;
@@ -58,6 +59,7 @@ export async function createTicket(data: CreateTicketData, customerId: string, t
 export async function listTickets(params: ListTicketsParams) {
   const where: Record<string, unknown> = { tenantId: params.tenantId };
 
+  if (params.customerId) where.customerId = params.customerId;
   if (params.status) where.status = params.status;
   if (params.priority) where.priority = params.priority;
   if (params.assignedToId) where.assignedToId = params.assignedToId;
@@ -87,7 +89,10 @@ export async function listTickets(params: ListTicketsParams) {
   const ticketIds = tickets.map((t) => t.id);
 
   const lastComments = await prisma.comment.findMany({
-    where: { ticketId: { in: ticketIds } },
+    where: {
+      ticketId: { in: ticketIds },
+      ...(params.customerId ? { type: 'public_reply' } : {}),
+    },
     orderBy: { createdAt: 'desc' },
     distinct: ['ticketId'],
     include: { author: { select: { name: true } } },

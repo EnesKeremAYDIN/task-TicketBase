@@ -52,14 +52,16 @@ function TicketList() {
     user = {};
   }
 
-  const isAgent = (user as { role?: string }).role === 'agent' || (user as { role?: string }).role === 'admin';
+  const userRole = (user as { role?: string }).role;
+  const isAgent = userRole === 'agent' || userRole === 'admin';
+  const canViewTickets = userRole === 'customer' || isAgent;
 
   const statusLabels: Record<string, string> = {
     new: 'Yeni', open: 'Açık', pending: 'Beklemede', resolved: 'Çözüldü', closed: 'Kapalı',
   };
 
   const load = useCallback(async () => {
-    if (!isAgent) return;
+    if (!canViewTickets) return;
     setLoading(true);
     try {
       const params: Record<string, string> = { page: String(page), limit: String(limit) };
@@ -76,7 +78,7 @@ function TicketList() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, statusFilter, priorityFilter, agentFilter, search, isAgent]);
+  }, [page, limit, statusFilter, priorityFilter, agentFilter, search, canViewTickets]);
 
   useEffect(() => {
     if (isAgent) {
@@ -108,13 +110,12 @@ function TicketList() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await createTicket({ title: newTitle, description: newDesc, priority: newPrio as Priority });
+      const createdTicket = await createTicket({ title: newTitle, description: newDesc, priority: newPrio as Priority });
       setShowCreate(false);
       setNewTitle('');
       setNewDesc('');
       setNewPrio('normal');
-      load();
-      if (isAgent) getDashboard().then((s) => setStats(s as DashboardStats)).catch(() => {});
+      navigate(`/tickets/${createdTicket.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Hata');
     }
@@ -239,14 +240,13 @@ function TicketList() {
         </div>
       )}
 
-      {isAgent && <Pagination page={page} total={total} limit={limit} onChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} />}
+      <Pagination page={page} total={total} limit={limit} onChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} />
 
-      {!isAgent ? (
-        <Card>
-          <p>Müşteri olarak ticket listesini görüntüleyemezsiniz.</p>
-        </Card>
-      ) : loading ? <Loading /> : tickets.length === 0 ? (
-        <EmptyState title="Ticket bulunamadı" description="Filtreleri değiştirmeyi deneyin." />
+      {loading ? <Loading /> : tickets.length === 0 ? (
+        <EmptyState
+          title="Ticket bulunamadı"
+          description={isAgent ? 'Filtreleri değiştirmeyi deneyin.' : 'Yeni bir ticket oluşturarak başlayabilirsiniz.'}
+        />
       ) : (
         <Card>
           <table className={styles.table}>
@@ -287,7 +287,7 @@ function TicketList() {
         </Card>
       )}
 
-      {isAgent && <Pagination page={page} total={total} limit={limit} onChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} />}
+      <Pagination page={page} total={total} limit={limit} onChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} />
 
       {isAgent && rules.length > 0 && (user as { role?: string }).role === 'admin' && (
         <Card title="İşletim Kuralları" style={{ marginTop: 24 }}>

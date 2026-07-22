@@ -115,7 +115,7 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 
 ### Tickets
 - `POST /api/tickets` — Ticket oluştur (müşteri)
-- `GET /api/tickets` — Ticket listesi (agent/admin, filtreli + sayfalı)
+- `GET /api/tickets` — Ticket listesi (agent/admin için tenant geneli, müşteri için yalnızca kendi ticket'ları; filtreli + sayfalı)
 - `GET /api/tickets/:id` — Ticket detayı
 - `PATCH /api/tickets/:id/status` — Durum güncelle (agent/admin)
 - `POST /api/tickets/:id/claim` — Ticket üstlen (agent)
@@ -144,7 +144,7 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 
 ## Test Sonuçları
 
-### Birim Testleri (`npm test`) — 61/61 ✅
+### Birim Testleri (`npm test`) — 63/63 ✅
 
 ```
 Test Files  5 passed (5)
@@ -154,7 +154,7 @@ Test Files  5 passed (5)
 | Test Dosyası | Test Sayısı | Kapsam |
 |-------------|-------------|--------|
 | auth.test.ts | 10 | Login, token doğrulama, middleware |
-| ticket.test.ts | 13 | CRUD, state machine, sequential number, claim/assign |
+| ticket.test.ts | 15 | CRUD, müşteri liste izolasyonu, yorum görünürlüğü, state machine, sequential number, claim/assign |
 | sla.test.ts | 14 | Business hours, SLA policy, comments, dashboard |
 | inbound-email.test.ts | 8 | Webhook, duplicate, validation |
 | extended.test.ts | 16 | Cross-tenant, race, pagination, SLA boundary, search |
