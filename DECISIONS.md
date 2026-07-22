@@ -32,7 +32,7 @@ Ticket numaralarının race condition olmadan üretilmesi için ayrı bir Ticket
 
 ## 2026-07-16 — State Machine Tasarımı
 
-Ticket durum geçişleri için ayrı bir state-machine modülü oluşturuldu. Geçerli geçişler: new→open→pending→resolved→closed. Her geçiş route'da validate ediliyor. Müşteri sadece kendi ticket'ını görebiliyor, agent/admin tüm ticket'ları görüyor. Customer ticket listesini göremiyor (sadece detay).
+Ticket durum geçişleri için ayrı bir state-machine modülü oluşturuldu. Geçerli geçişler: new→open→pending→resolved→closed. Her geçiş route'da validate ediliyor. Müşteri hem listede hem detay sayfasında yalnızca kendi ticket'larına erişebiliyor; agent/admin ise tenant içindeki tüm ticket'lara erişebiliyor.
 
 ## 2026-07-22 — `high` İlk Yanıt SLA Hedefi
 

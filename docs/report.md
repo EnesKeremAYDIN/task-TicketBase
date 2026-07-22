@@ -197,7 +197,7 @@ Durumlar: `new → open → pending → resolved → closed`
 
 | # | Öğe | Durum |
 |---|-----|-------|
-| 1 | Git repo (tüm commit geçmişiyle, squash yok) | ✅ **20 commit** |
+| 1 | Git repo (tüm commit geçmişiyle, squash yok) | ✅ Tüm commit geçmişi korunuyor |
 | 2 | README.md (kurulum, çalıştırma, test sonuçları) | ✅ Güncellendi |
 | 3 | DECISIONS.md + QUESTIONS.md | ✅ Mevcut |
 | 4 | AI transkriptleri | ✅ `/ai-transcripts/` klasöründe |
