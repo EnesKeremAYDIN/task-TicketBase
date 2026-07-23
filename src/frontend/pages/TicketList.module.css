@@ -34,6 +34,43 @@
 .searchInput {
   flex: 1;
 }
+.bulkCard {
+  margin-bottom: 16px;
+}
+.bulkHeader {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px;
+}
+.bulkControls {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.bulkControl {
+  width: 180px;
+}
+.bulkControlWide {
+  width: 240px;
+}
+.bulkResult {
+  margin-bottom: 16px; padding: 12px 16px; border: 1px solid var(--border);
+  border-radius: var(--radius-md); background: var(--bg);
+}
+.bulkResult ul {
+  margin: 8px 0 0 20px; color: var(--danger); font-size: 0.85rem;
+}
+.bulkConfirmText {
+  margin-bottom: 8px;
+}
+.bulkConfirmNote {
+  margin: 12px 0; color: var(--text-secondary); font-size: 0.85rem;
+}
+.bulkConfirmActions {
+  display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;
+}
+.checkboxCell {
+  width: 44px; text-align: center;
+}
+.checkboxCell input {
+  width: 16px; height: 16px; cursor: pointer;
+}
 .tableCard {
   /* uses Card styles */
 }
@@ -61,4 +98,11 @@
 }
 .rulesTable {
   width: 100%; border-collapse: collapse;
+}
+
+@media (max-width: 720px) {
+  .bulkControl,
+  .bulkControlWide {
+    width: 100%;
+  }
 }

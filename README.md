@@ -117,6 +117,7 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 - `POST /api/tickets` — Ticket oluştur (müşteri)
 - `GET /api/tickets` — Ticket listesi (agent/admin için tenant geneli, müşteri için yalnızca kendi ticket'ları; filtreli + sayfalı)
 - `GET /api/tickets/:id` — Ticket detayı
+- `POST /api/tickets/bulk` — En fazla 100 seçili ticket üzerinde durum, öncelik veya ajan işlemi (agent/admin)
 - `PATCH /api/tickets/:id/status` — Rol duyarlı durum güncelleme (agent/admin)
 - `POST /api/tickets/:id/confirm-resolution` — Çözümü onayla ve kapat (ticket sahibi müşteri)
 - `POST /api/tickets/:id/reject-resolution` — Çözümü reddet ve yeniden aç (ticket sahibi müşteri)
@@ -151,11 +152,11 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 
 ## Test Sonuçları
 
-### Birim Testleri (`npm test`) — 74/74 ✅
+### Birim Testleri (`npm test`) — 83/83 ✅
 
 ```
-Test Files  6 passed (6)
-     Tests  74 passed (74)
+Test Files  7 passed (7)
+     Tests  83 passed (83)
 ```
 
 | Test Dosyası | Test Sayısı | Kapsam |
@@ -164,6 +165,7 @@ Test Files  6 passed (6)
 | ticket.test.ts | 16 | CRUD, kategori filtresi, müşteri liste izolasyonu, yorum görünürlüğü, state machine, sequential number, claim/assign |
 | sla.test.ts | 15 | Business hours, sorgusuz SLA hesabı, SLA policy, comments, dashboard |
 | lifecycle.test.ts | 9 | Admin reopen, müşteri çözüm onayı/reddi, pending reminder, follow-up, otomatik kapanma |
+| bulk-ticket.test.ts | 9 | Rol yetkileri, state machine, SLA yeniden hesaplama, ajan atama, tenant izolasyonu, 100 kayıt limiti |
 | inbound-email.test.ts | 8 | Webhook, duplicate, validation |
 | extended.test.ts | 16 | Cross-tenant, race, pagination, SLA boundary, search |
 

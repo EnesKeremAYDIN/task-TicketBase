@@ -16,6 +16,21 @@ export type Status = 'new' | 'open' | 'pending' | 'resolved' | 'closed';
 export type Priority = 'low' | 'normal' | 'high' | 'urgent';
 export type TicketAction = Status | 'confirm_resolution' | 'reject_resolution' | 'create_follow_up';
 
+export type BulkTicketOperation =
+  | { type: 'status'; status: Exclude<Status, 'new'>; pendingUntil?: string; reason?: string }
+  | { type: 'priority'; priority: Priority }
+  | { type: 'assign'; agentId: string | null };
+
+export interface BulkTicketResultItem {
+  ticketId: string;
+  displayId: string;
+}
+
+export interface BulkTicketResult {
+  succeeded: BulkTicketResultItem[];
+  failed: Array<BulkTicketResultItem & { reason: string }>;
+}
+
 export interface Ticket {
   id: string;
   displayId: string;

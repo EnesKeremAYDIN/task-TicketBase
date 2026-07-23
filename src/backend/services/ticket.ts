@@ -16,6 +16,7 @@ interface StatusUpdateOptions {
   pendingUntil?: Date;
   pendingReason?: string;
   reason?: string;
+  auditNote?: string;
 }
 
 interface ListTicketsParams {
@@ -223,7 +224,16 @@ export async function updateTicketStatus(
       throw new ValidationError('Ticket durumu değişti, işlem tekrar denenmeli');
     }
 
-    if (options.reason?.trim() && (isAdminReopen || isCustomerRejection)) {
+    if (options.auditNote?.trim()) {
+      await tx.comment.create({
+        data: {
+          ticketId,
+          authorId: actorId,
+          type: 'internal_note',
+          body: options.auditNote.trim(),
+        },
+      });
+    } else if (options.reason?.trim() && (isAdminReopen || isCustomerRejection)) {
       await tx.comment.create({
         data: {
           ticketId,

@@ -13,6 +13,7 @@ import {
   claimTicket,
   assignTicket,
 } from '../services/ticket';
+import { bulkUpdateTickets } from '../services/bulk-ticket';
 
 const createTicketSchema = z.object({
   title: z.string().min(1, 'Başlık zorunludur').max(500),
@@ -38,6 +39,41 @@ const followUpSchema = z.object({
 
 const assignSchema = z.object({
   agentId: z.string().min(1, 'Ajan ID zorunludur'),
+});
+
+const bulkTicketSchema = z.object({
+  ticketIds: z.array(z.string().min(1))
+    .min(1, 'En az bir ticket seçilmelidir')
+    .max(100, 'Tek seferde en fazla 100 ticket güncellenebilir')
+    .refine((ids) => new Set(ids).size === ids.length, 'Ticket listesinde tekrar eden kayıtlar var'),
+  operation: z.discriminatedUnion('type', [
+    z.object({
+      type: z.literal('status'),
+      status: z.enum(['open', 'pending', 'resolved', 'closed']),
+      pendingUntil: z.string().datetime({ message: 'Geçerli bir bekleme tarihi giriniz' }).optional(),
+      reason: z.string().min(1, 'İşlem nedeni zorunludur').max(1000).optional(),
+    }),
+    z.object({
+      type: z.literal('priority'),
+      priority: z.enum(['low', 'normal', 'high', 'urgent']),
+    }),
+    z.object({
+      type: z.literal('assign'),
+      agentId: z.string().min(1).nullable(),
+    }),
+  ]),
+}).superRefine((data, ctx) => {
+  if (
+    data.operation.type === 'status'
+    && data.operation.status === 'pending'
+    && (!data.operation.pendingUntil || !data.operation.reason?.trim())
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Pending işlemi için tarih ve neden zorunludur',
+      path: ['operation'],
+    });
+  }
 });
 
 export async function ticketRoutes(app: FastifyInstance): Promise<void> {
@@ -81,6 +117,31 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
 
     const ticket = await getTicketById(id, user.tenantId, user.id, user.role);
     return ticket;
+  });
+
+  app.post('/api/tickets/bulk', async (request, _reply) => {
+    const user = requireRole(request, ['agent', 'admin']);
+    const parsed = bulkTicketSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new ValidationError(parsed.error.errors[0].message);
+    }
+
+    const operation = parsed.data.operation.type === 'status'
+      ? {
+        ...parsed.data.operation,
+        pendingUntil: parsed.data.operation.pendingUntil
+          ? new Date(parsed.data.operation.pendingUntil)
+          : undefined,
+      }
+      : parsed.data.operation;
+
+    return bulkUpdateTickets(
+      parsed.data.ticketIds,
+      user.tenantId,
+      user.id,
+      user.role as 'agent' | 'admin',
+      operation,
+    );
   });
 
   app.patch('/api/tickets/:id/status', async (request, _reply) => {

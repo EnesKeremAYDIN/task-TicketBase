@@ -51,3 +51,9 @@ Seed süresini uzatan ticket başına SLA sorguları kaldırıldı; aynı SLA fo
 Lineer durum makinesi gerçek destek akışlarında yetersiz kaldığı için rol duyarlı geçişlerle genişletildi. Admin neden belirterek `closed → open` yapabilir; müşteri `resolved` ticket'ın çözümünü onaylayabilir veya açıklamayla yeniden açabilir. Pending durumunda tarih ve neden zorunludur; süre dolduğunda ya da müşteri yanıtladığında ticket tekrar `open` olur.
 
 **Karar:** Kapalı ticket müşteri açısından değişmez kabul edildi. Web veya e-posta follow-up mesajı, eski kayda bağlı yeni ticket oluşturur ve yeni SLA başlatır; eski ticket'ı yalnızca admin yeniden açabilir. AI'nın her kapalı mesajda eski ticket'ı açma seçeneği, kapanma geçmişini ve SLA ölçümünü bozacağı için reddedildi. Backend `allowedActions` bilgisini döndürür ve frontend butonlarını bu tek kaynaktan üretir.
+
+## 2026-07-24 — Toplu Ticket İşlemlerinin Kapsamı
+
+Agent ve admin kullanıcıları ticket listesindeki mevcut sayfadan en fazla 100 kayıt seçerek durum, öncelik ve sahiplik işlemi yapabilir. Toplu durum değişiklikleri mevcut rol duyarlı state machine üzerinden yürür; öncelik değişikliğinde SLA tarihleri yeniden hesaplanır. Agent yalnızca atanmamış ticket'ları kendine alabilir, admin herhangi bir ajana atama yapabilir veya atamayı kaldırabilir.
+
+**Karar:** Filtreye uyan tüm kayıtları sunucu tarafında sınırsız güncellemek yerine yalnızca açık sayfadaki seçili ID'ler kabul edildi. Her ticket tenant ve yetki kurallarına göre ayrı değerlendirilir; uygun kayıtlar güncellenirken başarısız kayıtlar nedenleriyle döner. Böylece tek hatalı ticket bütün işlemi durdurmaz ve büyük, geri alınması zor güncellemeler önlenir.

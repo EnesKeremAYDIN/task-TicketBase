@@ -58,6 +58,10 @@
 - Müşteri `resolved` ticket'ın çözümünü onaylayabilir veya açıklamayla yeniden açabilir
 - Pending durumunda reminder tarihi ve neden zorunludur; süre dolduğunda veya müşteri yanıtladığında ticket açılır
 - Kapalı ticket follow-up mesajı eski kayda bağlı yeni ticket oluşturur
+- Agent/admin, mevcut sayfadaki en fazla 100 ticket üzerinde durum ve öncelik işlemi yapabilir
+- Agent yalnızca atanmamış ticket'ları topluca kendine alabilir; admin toplu atama veya atama kaldırma yapabilir
+- Toplu işlemler state machine, tenant ve SLA kurallarını tekil işlemlerle aynı şekilde uygular; uygun olmayan kayıtlar nedenleriyle raporlanır
+- Başarılı toplu değişiklikler ticket geçmişine iç not olarak kaydedilir
 - Açılış anında tenant içinde ardışık benzersiz numara (`ACME-1`, `ACME-2`...)
 - Atlama kabul edilir, **çakışma (duplicate) kabul edilmez** — eşzamanlı açılışta dahi (NFR-02)
 

@@ -39,6 +39,7 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
 - [ ] Ticket oluşturma endpoint'i (müşteri → `new`)
 - [ ] Rol duyarlı state machine: pending/resolved/closed durumlarından kontrollü yeniden açılma
 - [ ] Geçersiz geçişleri reddeden state validator
+- [ ] Mevcut sayfayla sınırlı toplu durum, öncelik ve ajan işlemleri
 - [ ] Tenant içi ardışık benzersiz numara üretimi (`ACME-1`, `ACME-2`...)
   - Transaction + unique constraint ile race condition koruması
 - [ ] Ticket listeleme: durum/öncelik/atanan/kategori filtreleri, arama, sayfalama, son yorum önizlemesi

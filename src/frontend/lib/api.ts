@@ -89,6 +89,16 @@ export async function createTicket(data: { title: string; description: string; p
   return request<import('./types').Ticket>('/tickets', { method: 'POST', body: JSON.stringify(data) });
 }
 
+export async function bulkUpdateTickets(
+  ticketIds: string[],
+  operation: import('./types').BulkTicketOperation,
+) {
+  return request<import('./types').BulkTicketResult>('/tickets/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ ticketIds, operation }),
+  });
+}
+
 export async function updateTicketStatus(
   id: string,
   status: string,

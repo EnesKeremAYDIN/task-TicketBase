@@ -66,6 +66,8 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Müşteri çözüm onayı | `resolved → closed` veya açıklamayla `resolved → open` |
 | Pending reminder | Tarih ve neden zorunlu; süresi gelince veya müşteri yanıtlayınca `open` |
 | Kapalı follow-up | Web/e-posta mesajı eski kayda bağlı yeni ticket oluşturur |
+| Toplu ticket işlemleri | En fazla 100 seçili kayıt; durum, öncelik ve ajan işlemleri; kısmi başarı sonucu ve iç not geçmişi |
+| Bulk rol kuralları | Agent kendine atar; admin atar/atamayı kaldırır; state machine ve tenant kontrolleri korunur |
 | Geçersiz geçiş reddi | `validateTransition()` → rol ve durum kontrolüyle `ValidationError` |
 | Ardışık benzersiz numara | `TicketCounter` tablosu, `$transaction` ile atomic increment |
 | Race condition koruması | `race-test` → 20/20 benzersiz |
@@ -175,7 +177,7 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 |-------|-------|
 | TypeScript strict: true | ✅ `tsconfig.json`'da tanımlı |
 | any kullanımı gerekçelendirilmeli | ✅ Minimal, tip dönüşümleri `as` ile |
-| Birim testleri | ✅ **74 test** (yaşam döngüsü, state machine, numbering, SLA, kategori, webhook, visibility) |
+| Birim testleri | ✅ **83 test** (bulk işlemler, yaşam döngüsü, state machine, numbering, SLA, kategori, webhook, visibility) |
 | Lint temiz | ✅ `npm run lint` 0 hata |
 
 ### NFR-05 — Zaman Yönetimi
@@ -216,7 +218,7 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Test | Sonuç |
 |------|-------|
 | `npm run lint` | ✅ **0 hata** |
-| `npm test` | ✅ **74/74 geçti** (6 dosya) |
+| `npm test` | ✅ **83/83 geçti** (7 dosya) |
 | `npm run race-test` | ✅ 20/20 benzersiz, 1/10 claim |
 | `npm run isolation-test` | ✅ 9/9 sıfır sızıntı |
 | `npm run perf` | ✅ Liste P95: **5ms**, Dashboard P95: **78ms** |
