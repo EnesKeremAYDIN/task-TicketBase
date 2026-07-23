@@ -40,7 +40,7 @@ Spec'te belirtilen tüm entity'ler `prisma/schema.prisma`'da tanımlandı:
 | InboundMessage | Webhook mesaj kaydı, dedup | ✅ `messageId` @unique |
 | Holiday | Tatil günleri | ✅ `@@unique([tenantId, date])` |
 
-Durumlar: `new → open → pending → resolved → closed`
+Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontrollü yeniden açılma desteklenir
 Öncelikler: `low`, `normal`, `high`, `urgent`
 
 ---
@@ -54,15 +54,19 @@ Durumlar: `new → open → pending → resolved → closed`
 | E-posta + şifre girişi | `POST /api/auth/login` → `services/auth.ts:loginUser()` |
 | Seed kullanıcılarıyla | 4 admin, 13 agent, 21 müşteri (şifre: 123456) |
 | JWT ile session | `@fastify/jwt`, 7 gün expiry, `tenantId` + `role` payload'da |
-| Tenant izolasyonu | Tüm sorgularda `tenantId` WHERE clause, `isolation-test` 8/8 |
+| Tenant izolasyonu | Tüm sorgularda `tenantId` WHERE clause, `isolation-test` 9/9 |
 
 ### FR-02 — Ticket Yaşam Döngüsü
 
 | İstek | Uygulama |
 |-------|----------|
 | Müşteri ticket açar (new) | `POST /api/tickets` → requireRole('customer') |
-| State machine | `lib/state-machine.ts` → `new→open→pending→resolved→closed` |
-| Geçersiz geçiş reddi | `validateTransition()` → `ValidationError` |
+| State machine | Rol duyarlı; pending/resolved/closed durumlarından kontrollü yeniden açılma |
+| Admin reopen | `closed → open`, neden zorunlu; ilk/son kapanma ve reopen sayısı korunur |
+| Müşteri çözüm onayı | `resolved → closed` veya açıklamayla `resolved → open` |
+| Pending reminder | Tarih ve neden zorunlu; süresi gelince veya müşteri yanıtlayınca `open` |
+| Kapalı follow-up | Web/e-posta mesajı eski kayda bağlı yeni ticket oluşturur |
+| Geçersiz geçiş reddi | `validateTransition()` → rol ve durum kontrolüyle `ValidationError` |
 | Ardışık benzersiz numara | `TicketCounter` tablosu, `$transaction` ile atomic increment |
 | Race condition koruması | `race-test` → 20/20 benzersiz |
 
@@ -81,7 +85,8 @@ Durumlar: `new → open → pending → resolved → closed`
 | Agent public_reply/internal_note | `createComment()` → type validasyonu |
 | Müşteri yalnızca public_reply | `ForbiddenError` internal_note yazmaya çalışırsa |
 | Müşteri yalnızca public_reply görür | `getTicketComments()` → `where: { type: 'public_reply' }` |
-| İlk public_reply firstResponseAt | `$transaction` ile atomik güncelleme |
+| İlk agent public_reply firstResponseAt | `$transaction` ile atomik güncelleme; müşteri mesajı SLA'yı durdurmaz |
+| Son aktivite | Her yorumda `lastActivityAt` güncellenir; otomatik kapanma bu alanı kullanır |
 
 ### FR-05 — E-posta Kanalı (Mock)
 
@@ -89,7 +94,8 @@ Durumlar: `new → open → pending → resolved → closed`
 |-------|----------|
 | Mock mail servisi | `src/mock-mail-channel/` → Fastify, port 4000 |
 | Webhook endpoint | `POST /api/webhook/inbound-email`, `x-webhook-secret` ile korumalı |
-| Konuda numara varsa → yorum | Regex `/[A-Z]+-(\d+)/i` ile eşleştirme |
+| Konuda aktif numara varsa → yorum | Regex `/[A-Z]+-(\d+)/i` ile eşleştirme; pending/resolved ticket açılır |
+| Konuda kapalı numara varsa → follow-up | Eski ticket'a bağlı yeni ticket oluşturulur |
 | Konuda numara yoksa → yeni ticket | `createTicket()` servisine yönlendirme |
 | Payload validasyonu | Zod schema: `messageId`, `tenant`, `from` (email), `body` (min 1) |
 | Duplicate koruma | `InboundMessage.messageId` @unique + `P2002` exception yakalama |
@@ -115,7 +121,7 @@ Durumlar: `new → open → pending → resolved → closed`
 | Sayfalama | `skip/take`, parametrik `page` + `limit` |
 | Son yorum önizlemesi | Ayrı `findMany` + `distinct['ticketId']` ile |
 | Dashboard (durum/öncelik/SLA/agent iş yükü) | `getDashboardStats()` → 4 paralel aggregate |
-| Akıcı çalışma (100k) | P95: list 5ms, dashboard 73ms |
+| Akıcı çalışma (100k) | P95: list 5ms, dashboard 78ms |
 
 ### FR-08 — İşletim Kuralları Ekranı
 
@@ -143,7 +149,7 @@ Durumlar: `new → open → pending → resolved → closed`
 | İstek | Limit | Gerçek | Durum |
 |-------|-------|--------|-------|
 | Ticket listesi p95 | <300ms | **5ms** | ✅ |
-| Dashboard p95 | <500ms | **73ms** | ✅ |
+| Dashboard p95 | <500ms | **78ms** | ✅ |
 | `npm run perf` script'i | — | Mevcut | ✅ |
 
 ### NFR-02 — Eşzamanlılık
@@ -161,7 +167,7 @@ Durumlar: `new → open → pending → resolved → closed`
 | ID tahmini | 404 | **404** | ✅ |
 | Müşteri yetki | 403 | **403** | ✅ |
 | internal_note sızıntı | 403 | **403** | ✅ |
-| **Sıfır sızıntı** | — | **8/8** | ✅ |
+| **Sıfır sızıntı** | — | **9/9** | ✅ |
 
 ### NFR-04 — Kod Kalitesi
 
@@ -169,7 +175,7 @@ Durumlar: `new → open → pending → resolved → closed`
 |-------|-------|
 | TypeScript strict: true | ✅ `tsconfig.json`'da tanımlı |
 | any kullanımı gerekçelendirilmeli | ✅ Minimal, tip dönüşümleri `as` ile |
-| Birim testleri | ✅ **65 test** (state machine, numbering, SLA, kategori, webhook, visibility) |
+| Birim testleri | ✅ **74 test** (yaşam döngüsü, state machine, numbering, SLA, kategori, webhook, visibility) |
 | Lint temiz | ✅ `npm run lint` 0 hata |
 
 ### NFR-05 — Zaman Yönetimi
@@ -210,10 +216,10 @@ Durumlar: `new → open → pending → resolved → closed`
 | Test | Sonuç |
 |------|-------|
 | `npm run lint` | ✅ **0 hata** |
-| `npm test` | ✅ **65/65 geçti** (5 dosya) |
+| `npm test` | ✅ **74/74 geçti** (6 dosya) |
 | `npm run race-test` | ✅ 20/20 benzersiz, 1/10 claim |
 | `npm run isolation-test` | ✅ 9/9 sıfır sızıntı |
-| `npm run perf` | ✅ Liste P95: **5ms**, Dashboard P95: **73ms** |
+| `npm run perf` | ✅ Liste P95: **5ms**, Dashboard P95: **78ms** |
 
 ---
 

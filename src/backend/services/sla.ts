@@ -28,6 +28,30 @@ export function calculateSLADeadlineValues(
   return { firstResponseSlaDue, slaDueAt };
 }
 
+export async function calculateTenantSLADeadlineValues(
+  tenantId: string,
+  priority: string,
+  startAt: Date,
+) {
+  const [slaPolicy, holidays] = await Promise.all([
+    prisma.sLAPolicy.findUnique({
+      where: { tenantId_priority: { tenantId, priority } },
+    }),
+    prisma.holiday.findMany({
+      where: { tenantId },
+      select: { date: true },
+    }),
+  ]);
+
+  if (!slaPolicy) return null;
+
+  return calculateSLADeadlineValues(
+    startAt,
+    slaPolicy,
+    holidays.map((holiday) => holiday.date),
+  );
+}
+
 export async function calculateSLADeadlines(ticketId: string, tenantId: string): Promise<void> {
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -36,28 +60,12 @@ export async function calculateSLADeadlines(ticketId: string, tenantId: string):
 
   if (!ticket) return;
 
-  const slaPolicy = await prisma.sLAPolicy.findUnique({
-    where: { tenantId_priority: { tenantId, priority: ticket.priority } },
-  });
-
-  if (!slaPolicy) return;
-
-  const holidays = await prisma.holiday.findMany({
-    where: { tenantId },
-    select: { date: true },
-  });
-
-  const holidayDates = holidays.map((h) => h.date);
-
-  const { firstResponseSlaDue, slaDueAt } = calculateSLADeadlineValues(
-    ticket.createdAt,
-    slaPolicy,
-    holidayDates,
-  );
+  const deadlines = await calculateTenantSLADeadlineValues(tenantId, ticket.priority, ticket.createdAt);
+  if (!deadlines) return;
 
   await prisma.ticket.update({
     where: { id: ticketId },
-    data: { slaDueAt, firstResponseSlaDue },
+    data: deadlines,
   });
 }
 
@@ -148,17 +156,24 @@ export async function getDashboardStats(tenantId: string) {
 
 export async function autoCloseResolvedTickets(tenantId?: string): Promise<number> {
   const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+  const closedAt = new Date();
 
   const where: Record<string, unknown> = {
     status: 'resolved',
-    updatedAt: { lt: fiveDaysAgo },
+    lastActivityAt: { lt: fiveDaysAgo },
     ...(tenantId ? { tenantId } : {}),
   };
 
-  const result = await prisma.ticket.updateMany({
-    where,
-    data: { status: 'closed', closedAt: new Date() },
-  });
+  const [firstClosures, repeatClosures] = await prisma.$transaction([
+    prisma.ticket.updateMany({
+      where: { ...where, firstClosedAt: null },
+      data: { status: 'closed', firstClosedAt: closedAt, closedAt, lastActivityAt: closedAt },
+    }),
+    prisma.ticket.updateMany({
+      where: { ...where, firstClosedAt: { not: null } },
+      data: { status: 'closed', closedAt, lastActivityAt: closedAt },
+    }),
+  ]);
 
-  return result.count;
+  return firstClosures.count + repeatClosures.count;
 }

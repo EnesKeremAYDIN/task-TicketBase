@@ -89,8 +89,33 @@ export async function createTicket(data: { title: string; description: string; p
   return request<import('./types').Ticket>('/tickets', { method: 'POST', body: JSON.stringify(data) });
 }
 
-export async function updateTicketStatus(id: string, status: string) {
-  return request<import('./types').Ticket>(`/tickets/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+export async function updateTicketStatus(
+  id: string,
+  status: string,
+  options: { pendingUntil?: string; pendingReason?: string; reason?: string } = {},
+) {
+  return request<import('./types').Ticket>(`/tickets/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, ...options }),
+  });
+}
+
+export async function confirmResolution(id: string) {
+  return request<import('./types').Ticket>(`/tickets/${id}/confirm-resolution`, { method: 'POST' });
+}
+
+export async function rejectResolution(id: string, reason: string) {
+  return request<import('./types').Ticket>(`/tickets/${id}/reject-resolution`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function createFollowUp(id: string, description: string) {
+  return request<import('./types').Ticket>(`/tickets/${id}/follow-up`, {
+    method: 'POST',
+    body: JSON.stringify({ description }),
+  });
 }
 
 export async function claimTicket(id: string) {

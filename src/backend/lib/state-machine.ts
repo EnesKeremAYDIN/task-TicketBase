@@ -1,26 +1,54 @@
 import { ValidationError } from './errors';
 
-const TRANSITIONS: Record<string, string[]> = {
+export const TICKET_STATUSES = ['new', 'open', 'pending', 'resolved', 'closed'] as const;
+export type TicketStatus = typeof TICKET_STATUSES[number];
+export type TicketRole = 'admin' | 'agent' | 'customer';
+export type TicketAction = TicketStatus | 'confirm_resolution' | 'reject_resolution' | 'create_follow_up';
+
+const TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   new: ['open'],
-  open: ['pending', 'resolved', 'closed'],
-  pending: ['open', 'closed'],
-  resolved: ['closed'],
-  closed: [],
+  open: ['pending', 'resolved'],
+  pending: ['open', 'resolved'],
+  resolved: ['open', 'closed'],
+  closed: ['open'],
 };
 
-const VALID_STATUSES = Object.keys(TRANSITIONS);
-
-export function isValidStatus(status: string): boolean {
-  return VALID_STATUSES.includes(status);
+export function isValidStatus(status: string): status is TicketStatus {
+  return TICKET_STATUSES.includes(status as TicketStatus);
 }
 
-export function isValidTransition(from: string, to: string): boolean {
+export function getAllowedTransitions(status: string, role: TicketRole): TicketStatus[] {
+  if (!isValidStatus(status)) return [];
+
+  if (role === 'customer') {
+    return status === 'resolved' ? ['open', 'closed'] : [];
+  }
+
+  const transitions = TRANSITIONS[status];
+  if (role === 'admin') return [...transitions];
+
+  return transitions.filter((target) => target !== 'closed' && status !== 'closed');
+}
+
+export function getAllowedActions(status: string, role: TicketRole): TicketAction[] {
+  if (!isValidStatus(status)) return [];
+
+  if (role === 'customer') {
+    if (status === 'resolved') return ['confirm_resolution', 'reject_resolution'];
+    if (status === 'closed') return ['create_follow_up'];
+    return [];
+  }
+
+  return getAllowedTransitions(status, role);
+}
+
+export function isValidTransition(from: string, to: string, role: TicketRole): boolean {
+  if (!isValidStatus(from) || !isValidStatus(to)) return false;
   const allowed = TRANSITIONS[from];
-  if (!allowed) return false;
-  return allowed.includes(to);
+  return allowed.includes(to) && getAllowedTransitions(from, role).includes(to);
 }
 
-export function validateTransition(from: string, to: string): void {
+export function validateTransition(from: string, to: string, role: TicketRole): void {
   if (!isValidStatus(from)) {
     throw new ValidationError(`Geçersiz kaynak durum: ${from}`);
   }
@@ -29,7 +57,7 @@ export function validateTransition(from: string, to: string): void {
     throw new ValidationError(`Geçersiz hedef durum: ${to}`);
   }
 
-  if (!isValidTransition(from, to)) {
+  if (!isValidTransition(from, to, role)) {
     throw new ValidationError(`'${from}' durumundan '${to}' durumuna geçiş yapılamaz`);
   }
 }

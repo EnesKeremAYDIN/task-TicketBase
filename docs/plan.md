@@ -37,7 +37,7 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
 ## Aşama 3 — Ticket CRUD + State Machine + Atama
 
 - [ ] Ticket oluşturma endpoint'i (müşteri → `new`)
-- [ ] State machine: `new → open → pending → resolved → closed`
+- [ ] Rol duyarlı state machine: pending/resolved/closed durumlarından kontrollü yeniden açılma
 - [ ] Geçersiz geçişleri reddeden state validator
 - [ ] Tenant içi ardışık benzersiz numara üretimi (`ACME-1`, `ACME-2`...)
   - Transaction + unique constraint ile race condition koruması

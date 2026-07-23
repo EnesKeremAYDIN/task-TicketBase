@@ -34,13 +34,13 @@
 | **Tenant** | Platformu kullanan şirket. Kendi kullanıcıları, ticket'ları, ayarları var. **Veri asla başka tenant'a görünmez** |
 | **User** | Bir tenant'a bağlı. Roller: `admin`, `agent` (destek), `customer` (talep açan) |
 | **Ticket** | Talep kaydı. Alanlar: tenant içi ardışık numara (`ACME-1042`), başlık, açıklama, durum, öncelik, kategori, açan müşteri, atanan agent, zaman damgaları |
-| **→ Durumlar** | `new` → `open` → `pending` → `resolved` → `closed` |
+| **→ Durumlar** | Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontrollü yeniden açılma desteklenir |
 | **→ Öncelikler** | `low`, `normal`, `high`, `urgent` |
 | **Comment** | İki tür: `public_reply` (müşteri görür) ve `internal_note` (sadece agent/admin) |
 | **SLA Policy** | Önceliğe göre ilk yanıt ve çözüm süresi hedefleri (tenant başına, seed'de hazır) |
 | **InboundMessage** | Mock e-posta kanalından gelen ham mesaj kaydı |
 
-**Seed verisi:** 4 tenant, tenant başına 5-15 kullanıcı, ~100.000 ticket, ~400.000 yorum
+**Seed verisi:** 4 tenant, 38 sabit kullanıcı, 100.000 ticket, 400.000 yorum
 
 ---
 
@@ -54,6 +54,10 @@
 ### FR-02 — Ticket Yaşam Döngüsü
 - Müşteri → `new` açar; agent yanıtlayınca → `open`; bilgi bekleniyorsa → `pending`; çözüm sonrası → `resolved`; müşteri onayı veya 5 gün hareketsizlik → `closed`
 - Geçersiz durum geçişleri reddedilir (örn. `closed` → `pending`)
+- Admin, neden belirterek `closed → open` yapabilir; ilk/son kapanma zamanı ve reopen sayısı korunur
+- Müşteri `resolved` ticket'ın çözümünü onaylayabilir veya açıklamayla yeniden açabilir
+- Pending durumunda reminder tarihi ve neden zorunludur; süre dolduğunda veya müşteri yanıtladığında ticket açılır
+- Kapalı ticket follow-up mesajı eski kayda bağlı yeni ticket oluşturur
 - Açılış anında tenant içinde ardışık benzersiz numara (`ACME-1`, `ACME-2`...)
 - Atlama kabul edilir, **çakışma (duplicate) kabul edilmez** — eşzamanlı açılışta dahi (NFR-02)
 
@@ -66,12 +70,13 @@
 ### FR-04 — Yorumlar ve Görünürlük
 - Agent: `public_reply` veya `internal_note` yazabilir
 - Müşteri: yalnızca `public_reply` yazabilir ve **yalnızca** `public_reply` görebilir
-- İlk `public_reply`, SLA "ilk yanıt" saatini durdurur
+- İlk agent/admin `public_reply`, SLA "ilk yanıt" saatini durdurur; müşteri mesajı ilk yanıt sayılmaz
 
 ### FR-05 — E-posta Kanalı (Mock)
 - `mock-mail-channel` servisi webhook gönderir (API sözleşmesi kendi README'sinde)
 - Her zaman ideal payload göndermeyebilir (edge case'lere hazırlıklı ol)
-- Konuda ticket numarası varsa → yorum olarak ekle
+- Konuda aktif ticket numarası varsa → yorum olarak ekle; pending/resolved ticket müşteri mesajıyla açılır
+- Konuda kapalı ticket numarası varsa → eski kayda bağlı yeni follow-up ticket aç
 - Konuda ticket numarası yoksa → yeni ticket aç
 - **Gelen her veri doğrulanmalı** — bozuk payload sistemi düşürmemeli, kayıt altına alınmalı
 - **Duplicate teslim önlenmeli** — aynı mesaj iki kez işlenemez
@@ -104,6 +109,9 @@
 | Kural | Değer |
 |---|---|
 | Otomatik kapanma (resolved → closed) | 5 gün hareketsizlik |
+| Kapalı ticket yeniden açma | Yalnızca admin, neden zorunlu |
+| Kapalı ticket follow-up | Yeni ve bağlantılı ticket oluşturulur |
+| Pending reminder | Tarih geldiğinde ticket yeniden açılır |
 | `high` önceliğin ilk yanıt hedefi | 4 saat |
 | Mesai saatleri | Hafta içi 09:00-18:00 |
 | Webhook yeniden deneme penceresi | 24 saat |

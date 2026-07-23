@@ -117,7 +117,10 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 - `POST /api/tickets` — Ticket oluştur (müşteri)
 - `GET /api/tickets` — Ticket listesi (agent/admin için tenant geneli, müşteri için yalnızca kendi ticket'ları; filtreli + sayfalı)
 - `GET /api/tickets/:id` — Ticket detayı
-- `PATCH /api/tickets/:id/status` — Durum güncelle (agent/admin)
+- `PATCH /api/tickets/:id/status` — Rol duyarlı durum güncelleme (agent/admin)
+- `POST /api/tickets/:id/confirm-resolution` — Çözümü onayla ve kapat (ticket sahibi müşteri)
+- `POST /api/tickets/:id/reject-resolution` — Çözümü reddet ve yeniden aç (ticket sahibi müşteri)
+- `POST /api/tickets/:id/follow-up` — Kapalı ticket'a bağlı yeni takip ticket'ı oluştur (ticket sahibi müşteri)
 - `POST /api/tickets/:id/claim` — Ticket üstlen (agent)
 - `POST /api/tickets/:id/assign` — Ticket ata (admin)
 
@@ -141,17 +144,18 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 - **100.000 ticket**: Tenant başına 25.000; durum, öncelik ve kategori dağılımı deterministik
 - **400.000 yorum**: Tenant başına 100.000; dağılımı deterministik
 - **7 kategori**: Donanım, Yazılım, Ağ, Erişim, E-posta, Güvenlik, Diğer
+- **Yaşam döngüsü örnekleri**: Pending reminder ve yeniden açılma geçmişi bulunan ticket'lar
 - **SLA deadline'ları**: Veritabanına yazılmadan önce bellekte hesaplanır
 - **Tekrarlanabilir sonuç**: Seed anahtarı `20260722`; aynı komut aynı kullanıcıları ve içerik dağılımını üretir
 - **Ölçülen `db:reset` süresi**: 65–85 saniye (iki yerel doğrulama çalışması)
 
 ## Test Sonuçları
 
-### Birim Testleri (`npm test`) — 65/65 ✅
+### Birim Testleri (`npm test`) — 74/74 ✅
 
 ```
-Test Files  5 passed (5)
-     Tests  65 passed (65)
+Test Files  6 passed (6)
+     Tests  74 passed (74)
 ```
 
 | Test Dosyası | Test Sayısı | Kapsam |
@@ -159,6 +163,7 @@ Test Files  5 passed (5)
 | auth.test.ts | 10 | Login, token doğrulama, middleware |
 | ticket.test.ts | 16 | CRUD, kategori filtresi, müşteri liste izolasyonu, yorum görünürlüğü, state machine, sequential number, claim/assign |
 | sla.test.ts | 15 | Business hours, sorgusuz SLA hesabı, SLA policy, comments, dashboard |
+| lifecycle.test.ts | 9 | Admin reopen, müşteri çözüm onayı/reddi, pending reminder, follow-up, otomatik kapanma |
 | inbound-email.test.ts | 8 | Webhook, duplicate, validation |
 | extended.test.ts | 16 | Cross-tenant, race, pagination, SLA boundary, search |
 
@@ -171,7 +176,7 @@ Ticket Listesi:
 
 Dashboard:
    Ortalama: 46.9ms
-   P95: 73ms
+   P95: 78ms
    Durum: ✅ BAŞARILI (<500ms)
 ```
 
@@ -191,9 +196,9 @@ Dashboard:
 ```
 1. Çapraz tenant erişim:     ✅ 3/3
 2. ID tahmini koruması:       ✅ 1/1
-3. Rol bazlı yetkilendirme:   ✅ 3/3
+3. Rol bazlı yetkilendirme:   ✅ 4/4
 4. Yorum görünürlüğü:        ✅ 1/1
-Genel: ✅ 8/8 BAŞARILI (sıfır sızıntı)
+Genel: ✅ 9/9 BAŞARILI (sıfır sızıntı)
 ```
 
 ### Kod Kalitesi (`npm run lint`)

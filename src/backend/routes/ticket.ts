@@ -7,6 +7,9 @@ import {
   listTickets,
   getTicketById,
   updateTicketStatus,
+  confirmResolution,
+  rejectResolution,
+  createFollowUpTicket,
   claimTicket,
   assignTicket,
 } from '../services/ticket';
@@ -20,6 +23,17 @@ const createTicketSchema = z.object({
 
 const updateStatusSchema = z.object({
   status: z.enum(['new', 'open', 'pending', 'resolved', 'closed']),
+  pendingUntil: z.string().datetime({ message: 'Geçerli bir bekleme tarihi giriniz' }).optional(),
+  pendingReason: z.string().min(1, 'Bekleme nedeni zorunludur').max(500).optional(),
+  reason: z.string().min(1, 'İşlem nedeni zorunludur').max(1000).optional(),
+});
+
+const resolutionRejectionSchema = z.object({
+  reason: z.string().min(1, 'Sorunun neden devam ettiğini açıklayın').max(1000),
+});
+
+const followUpSchema = z.object({
+  description: z.string().min(1, 'Açıklama zorunludur').max(10000),
 });
 
 const assignSchema = z.object({
@@ -78,8 +92,52 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
       throw new ValidationError(parsed.error.errors[0].message);
     }
 
-    const ticket = await updateTicketStatus(id, user.tenantId, parsed.data.status);
+    const ticket = await updateTicketStatus(
+      id,
+      user.tenantId,
+      parsed.data.status,
+      user.id,
+      user.role,
+      {
+        pendingUntil: parsed.data.pendingUntil ? new Date(parsed.data.pendingUntil) : undefined,
+        pendingReason: parsed.data.pendingReason,
+        reason: parsed.data.reason,
+      },
+    );
     return ticket;
+  });
+
+  app.post('/api/tickets/:id/confirm-resolution', async (request, _reply) => {
+    const user = requireRole(request, ['customer']);
+    const { id } = request.params as { id: string };
+    return confirmResolution(id, user.tenantId, user.id);
+  });
+
+  app.post('/api/tickets/:id/reject-resolution', async (request, _reply) => {
+    const user = requireRole(request, ['customer']);
+    const { id } = request.params as { id: string };
+    const parsed = resolutionRejectionSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new ValidationError(parsed.error.errors[0].message);
+    }
+    return rejectResolution(id, user.tenantId, user.id, parsed.data.reason);
+  });
+
+  app.post('/api/tickets/:id/follow-up', async (request, reply) => {
+    const user = requireRole(request, ['customer']);
+    const { id } = request.params as { id: string };
+    const parsed = followUpSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new ValidationError(parsed.error.errors[0].message);
+    }
+    const ticket = await createFollowUpTicket(
+      id,
+      user.tenantId,
+      (user as { tenantSlug?: string }).tenantSlug || '',
+      user.id,
+      parsed.data.description,
+    );
+    return reply.status(201).send(ticket);
   });
 
   app.post('/api/tickets/:id/claim', async (request, _reply) => {

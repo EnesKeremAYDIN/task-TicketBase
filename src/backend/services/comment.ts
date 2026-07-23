@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma';
 import { NotFoundError, ValidationError, ForbiddenError } from '../lib/errors';
 import { tenantFilter } from '../lib/tenant-context';
+import { calculateTenantSLADeadlineValues } from './sla';
 
 const VALID_TYPES = ['public_reply', 'internal_note'];
 
@@ -36,26 +37,50 @@ export async function createComment(
     throw new ValidationError('Kapalı ticket\'a yorum eklenemez');
   }
 
-  const comment = await prisma.$transaction(async (tx) => {
-    const isFirstPublicReply = type === 'public_reply' && !ticket.firstResponseAt;
+  const now = new Date();
+  const isFirstAgentPublicReply = (
+    type === 'public_reply'
+    && ['agent', 'admin'].includes(authorRole)
+    && !ticket.firstResponseAt
+  );
+  const shouldReopenForCustomerReply = (
+    authorRole === 'customer'
+    && type === 'public_reply'
+    && ['pending', 'resolved'].includes(ticket.status)
+  );
+  const reopenDeadlines = shouldReopenForCustomerReply && ticket.status === 'resolved'
+    ? await calculateTenantSLADeadlineValues(authorTenantId, ticket.priority, now)
+    : null;
 
-    if (isFirstPublicReply && ticket.status === 'new') {
-      await tx.ticket.update({
-        where: { id: ticketId },
-        data: {
-          status: 'open',
-          firstResponseAt: new Date(),
-        },
-      });
-    } else if (isFirstPublicReply && !ticket.firstResponseAt) {
-      await tx.ticket.update({
-        where: { id: ticketId },
-        data: { firstResponseAt: new Date() },
-      });
+  const comment = await prisma.$transaction(async (tx) => {
+    const ticketUpdate: Record<string, unknown> = { lastActivityAt: now };
+
+    if (isFirstAgentPublicReply) {
+      ticketUpdate.firstResponseAt = now;
+      if (ticket.status === 'new') ticketUpdate.status = 'open';
+    }
+
+    if (shouldReopenForCustomerReply) {
+      ticketUpdate.status = 'open';
+      ticketUpdate.pendingUntil = null;
+      ticketUpdate.pendingReason = null;
+      if (reopenDeadlines) {
+        ticketUpdate.slaDueAt = reopenDeadlines.slaDueAt;
+        ticketUpdate.slaBreached = false;
+      }
+    }
+
+    const updateResult = await tx.ticket.updateMany({
+      where: { id: ticketId, status: ticket.status },
+      data: ticketUpdate,
+    });
+
+    if (updateResult.count === 0) {
+      throw new ValidationError('Ticket durumu değişti, yorum tekrar gönderilmeli');
     }
 
     return tx.comment.create({
-      data: { ticketId, authorId, type, body },
+      data: { ticketId, authorId, type, body, createdAt: now },
       include: {
         author: { select: { id: true, name: true, role: true } },
       },

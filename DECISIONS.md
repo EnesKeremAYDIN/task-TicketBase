@@ -45,3 +45,9 @@ FR-06 SLA tablosunda `high` önceliğin ilk yanıt hedefi 2 saat olarak belirtil
 Seed süresini uzatan ticket başına SLA sorguları kaldırıldı; aynı SLA formülü kullanılarak deadline değerleri `createMany` öncesinde bellekte hesaplanıyor. Kullanıcı hesapları dokümantasyonla uyumlu sabit fixture'lara taşındı, ticket ve yorum çeşitliliği ise `20260722` anahtarlı deterministik üreticiyle korunuyor.
 
 **Karar:** AI, yeni bir seed kütüphanesi eklemek yerine mevcut SLA ve Prisma yapısının yeniden kullanılmasını önerdi; gereksiz bağımlılık yaratmadığı için kabul edildi. Demo ve filtre testleri için her tenant'a Donanım, Yazılım, Ağ, Erişim, E-posta, Güvenlik ve Diğer kategorileri garantili olarak dağıtılıyor.
+
+## 2026-07-23 — Ticket Yaşam Döngüsü ve Kapalı Follow-up Politikası
+
+Lineer durum makinesi gerçek destek akışlarında yetersiz kaldığı için rol duyarlı geçişlerle genişletildi. Admin neden belirterek `closed → open` yapabilir; müşteri `resolved` ticket'ın çözümünü onaylayabilir veya açıklamayla yeniden açabilir. Pending durumunda tarih ve neden zorunludur; süre dolduğunda ya da müşteri yanıtladığında ticket tekrar `open` olur.
+
+**Karar:** Kapalı ticket müşteri açısından değişmez kabul edildi. Web veya e-posta follow-up mesajı, eski kayda bağlı yeni ticket oluşturur ve yeni SLA başlatır; eski ticket'ı yalnızca admin yeniden açabilir. AI'nın her kapalı mesajda eski ticket'ı açma seçeneği, kapanma geçmişini ve SLA ölçümünü bozacağı için reddedildi. Backend `allowedActions` bilgisini döndürür ve frontend butonlarını bu tek kaynaktan üretir.

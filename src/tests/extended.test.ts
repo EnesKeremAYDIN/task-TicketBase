@@ -121,7 +121,7 @@ describe('Closed Ticket Comment', () => {
     await app.inject({
       method: 'PATCH',
       url: `/api/tickets/${ticketId}/status`,
-      headers: { authorization: `Bearer ${agentToken}` },
+      headers: { authorization: `Bearer ${adminToken}` },
       payload: { status: 'closed' },
     });
   });
@@ -339,16 +339,16 @@ describe('Status Race Condition', () => {
       payload: { status: 'open' },
     });
 
-    const closeRequests = Array.from({ length: 5 }, () =>
+    const resolveRequests = Array.from({ length: 5 }, () =>
       app.inject({
         method: 'PATCH',
         url: `/api/tickets/${ticketId}/status`,
         headers: { authorization: `Bearer ${agentToken}` },
-        payload: { status: 'closed' },
+        payload: { status: 'resolved' },
       }),
     );
 
-    const results = await Promise.all(closeRequests);
+    const results = await Promise.all(resolveRequests);
     const successCount = results.filter((r) => r.statusCode === 200).length;
 
     expect(successCount).toBe(1);

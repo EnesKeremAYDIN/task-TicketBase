@@ -14,6 +14,7 @@ export interface User {
 
 export type Status = 'new' | 'open' | 'pending' | 'resolved' | 'closed';
 export type Priority = 'low' | 'normal' | 'high' | 'urgent';
+export type TicketAction = Status | 'confirm_resolution' | 'reject_resolution' | 'create_follow_up';
 
 export interface Ticket {
   id: string;
@@ -28,6 +29,16 @@ export interface Ticket {
   lastComment: { body: string; createdAt: string; author: { name: string } } | null;
   createdAt: string;
   firstResponseAt: string | null;
+  resolvedAt: string | null;
+  firstClosedAt: string | null;
+  closedAt: string | null;
+  lastReopenedAt: string | null;
+  reopenCount: number;
+  pendingUntil: string | null;
+  pendingReason: string | null;
+  lastActivityAt: string;
+  followUpOf: { id: string; displayId: string; title: string } | null;
+  allowedActions: TicketAction[];
   slaBreached: boolean;
   slaDueAt: string | null;
   firstResponseSlaDue: string | null;

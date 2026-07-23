@@ -352,6 +352,20 @@ describe('Ticket CRUD', () => {
       method: 'PATCH',
       url: `/api/tickets/${ticketId}/status`,
       headers: { authorization: `Bearer ${agentToken}` },
+      payload: { status: 'open' },
+    });
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/tickets/${ticketId}/status`,
+      headers: { authorization: `Bearer ${agentToken}` },
+      payload: { status: 'resolved' },
+    });
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/tickets/${ticketId}/status`,
+      headers: { authorization: `Bearer ${adminToken}` },
       payload: { status: 'closed' },
     });
 

@@ -1,14 +1,21 @@
 import prisma from '../lib/prisma';
 import { NotFoundError, ValidationError } from '../lib/errors';
-import { validateTransition } from '../lib/state-machine';
+import { getAllowedActions, validateTransition, type TicketRole } from '../lib/state-machine';
 import { tenantFilter } from '../lib/tenant-context';
-import { calculateSLADeadlines } from './sla';
+import { calculateSLADeadlines, calculateTenantSLADeadlineValues } from './sla';
 
 interface CreateTicketData {
   title: string;
   description: string;
   priority?: string;
   category?: string;
+  followUpOfId?: string;
+}
+
+interface StatusUpdateOptions {
+  pendingUntil?: Date;
+  pendingReason?: string;
+  reason?: string;
 }
 
 interface ListTicketsParams {
@@ -44,6 +51,7 @@ export async function createTicket(data: CreateTicketData, customerId: string, t
         priority: data.priority || 'normal',
         category: data.category || null,
         customerId,
+        followUpOfId: data.followUpOfId || null,
       },
       include: {
         customer: { select: { id: true, name: true, email: true } },
@@ -117,6 +125,7 @@ export async function getTicketById(ticketId: string, tenantId: string, userId?:
     include: {
       customer: { select: { id: true, name: true, email: true } },
       assignedTo: { select: { id: true, name: true } },
+      followUpOf: { select: { id: true, displayId: true, title: true } },
     },
   });
 
@@ -128,10 +137,21 @@ export async function getTicketById(ticketId: string, tenantId: string, userId?:
     throw new NotFoundError('Ticket bulunamadı');
   }
 
-  return ticket;
+  const allowedActions = userRole
+    ? getAllowedActions(ticket.status, userRole as TicketRole)
+    : [];
+
+  return { ...ticket, allowedActions };
 }
 
-export async function updateTicketStatus(ticketId: string, tenantId: string, newStatus: string) {
+export async function updateTicketStatus(
+  ticketId: string,
+  tenantId: string,
+  newStatus: string,
+  actorId: string,
+  actorRole: TicketRole,
+  options: StatusUpdateOptions = {},
+) {
   const ticket = await prisma.ticket.findFirst({
     where: { id: ticketId, ...tenantFilter(tenantId) },
   });
@@ -140,32 +160,159 @@ export async function updateTicketStatus(ticketId: string, tenantId: string, new
     throw new NotFoundError('Ticket bulunamadı');
   }
 
-  validateTransition(ticket.status, newStatus);
+  validateTransition(ticket.status, newStatus, actorRole);
 
-  const updateData: Record<string, unknown> = { status: newStatus };
+  const now = new Date();
+  if (newStatus === 'pending') {
+    if (!options.pendingUntil || options.pendingUntil <= now) {
+      throw new ValidationError('Bekleme tarihi gelecekte olmalıdır');
+    }
+    if (!options.pendingReason?.trim()) {
+      throw new ValidationError('Bekleme nedeni zorunludur');
+    }
+  }
+
+  const isAdminReopen = ticket.status === 'closed' && newStatus === 'open';
+  const isCustomerRejection = actorRole === 'customer' && ticket.status === 'resolved' && newStatus === 'open';
+
+  if ((isAdminReopen || isCustomerRejection) && !options.reason?.trim()) {
+    throw new ValidationError(isAdminReopen ? 'Yeniden açma nedeni zorunludur' : 'Sorunun neden devam ettiğini açıklayın');
+  }
+
+  const updateData: Record<string, unknown> = { status: newStatus, lastActivityAt: now };
+
+  if (newStatus !== 'pending') {
+    updateData.pendingUntil = null;
+    updateData.pendingReason = null;
+  }
+
+  if (newStatus === 'pending') {
+    updateData.pendingUntil = options.pendingUntil;
+    updateData.pendingReason = options.pendingReason?.trim();
+  }
 
   if (newStatus === 'resolved') {
-    updateData.resolvedAt = new Date();
+    updateData.resolvedAt = now;
   }
 
   if (newStatus === 'closed') {
-    updateData.closedAt = new Date();
+    updateData.firstClosedAt = ticket.firstClosedAt || now;
+    updateData.closedAt = now;
   }
 
-  const result = await prisma.ticket.updateMany({
-    where: { id: ticketId, tenantId, status: ticket.status },
-    data: updateData,
+  if (isAdminReopen) {
+    updateData.lastReopenedAt = now;
+    updateData.reopenCount = { increment: 1 };
+  }
+
+  if (newStatus === 'open' && ['resolved', 'closed'].includes(ticket.status)) {
+    const deadlines = await calculateTenantSLADeadlineValues(tenantId, ticket.priority, now);
+    if (deadlines) {
+      updateData.slaDueAt = deadlines.slaDueAt;
+      updateData.slaBreached = false;
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.ticket.updateMany({
+      where: { id: ticketId, tenantId, status: ticket.status },
+      data: updateData,
+    });
+
+    if (result.count === 0) {
+      throw new ValidationError('Ticket durumu değişti, işlem tekrar denenmeli');
+    }
+
+    if (options.reason?.trim() && (isAdminReopen || isCustomerRejection)) {
+      await tx.comment.create({
+        data: {
+          ticketId,
+          authorId: actorId,
+          type: isAdminReopen ? 'internal_note' : 'public_reply',
+          body: options.reason.trim(),
+        },
+      });
+    }
   });
-
-  if (result.count === 0) {
-    throw new ValidationError('Ticket durumu değişti, işlem tekrar denenmeli');
-  }
 
   const updated = await prisma.ticket.findFirst({
     where: { id: ticketId, ...tenantFilter(tenantId) },
   });
 
   return updated;
+}
+
+export async function confirmResolution(ticketId: string, tenantId: string, customerId: string) {
+  await requireTicketOwnerWithStatus(ticketId, tenantId, customerId, 'resolved');
+  return updateTicketStatus(ticketId, tenantId, 'closed', customerId, 'customer');
+}
+
+export async function rejectResolution(ticketId: string, tenantId: string, customerId: string, reason: string) {
+  await requireTicketOwnerWithStatus(ticketId, tenantId, customerId, 'resolved');
+  return updateTicketStatus(ticketId, tenantId, 'open', customerId, 'customer', { reason });
+}
+
+export async function createFollowUpTicket(
+  ticketId: string,
+  tenantId: string,
+  tenantSlug: string,
+  customerId: string,
+  description: string,
+) {
+  const ticket = await requireTicketOwnerWithStatus(ticketId, tenantId, customerId, 'closed');
+
+  return createTicket(
+    {
+      title: `Takip: ${ticket.title}`,
+      description,
+      priority: ticket.priority,
+      category: ticket.category || undefined,
+      followUpOfId: ticket.id,
+    },
+    customerId,
+    tenantId,
+    tenantSlug,
+  );
+}
+
+async function requireTicketOwnerWithStatus(
+  ticketId: string,
+  tenantId: string,
+  customerId: string,
+  status: string,
+) {
+  const ticket = await prisma.ticket.findFirst({
+    where: { id: ticketId, tenantId, customerId },
+  });
+
+  if (!ticket) {
+    throw new NotFoundError('Ticket bulunamadı');
+  }
+
+  if (ticket.status !== status) {
+    throw new ValidationError(`Bu işlem yalnızca '${status}' durumundaki ticket için yapılabilir`);
+  }
+
+  return ticket;
+}
+
+export async function reactivatePendingTickets(tenantId?: string): Promise<number> {
+  const now = new Date();
+  const result = await prisma.ticket.updateMany({
+    where: {
+      status: 'pending',
+      pendingUntil: { lte: now },
+      ...(tenantId ? { tenantId } : {}),
+    },
+    data: {
+      status: 'open',
+      pendingUntil: null,
+      pendingReason: null,
+      lastActivityAt: now,
+    },
+  });
+
+  return result.count;
 }
 
 export async function claimTicket(ticketId: string, tenantId: string, agentId: string) {

@@ -13,6 +13,7 @@ import { rulesRoutes } from './routes/rules';
 import { agentRoutes } from './routes/agent';
 import { AppError } from './lib/errors';
 import { autoCloseResolvedTickets } from './services/sla';
+import { reactivatePendingTickets } from './services/ticket';
 
 const app = Fastify({ logger: true });
 
@@ -60,15 +61,19 @@ const start = async () => {
   await app.register(rulesRoutes);
   await app.register(agentRoutes);
 
-  const AUTO_CLOSE_INTERVAL = 60 * 60 * 1000;
+  const LIFECYCLE_CHECK_INTERVAL = 60 * 60 * 1000;
   setInterval(async () => {
     try {
-      const count = await autoCloseResolvedTickets();
-      if (count > 0) app.log.info(`${count} ticket otomatik kapatıldı`);
+      const [closedCount, reactivatedCount] = await Promise.all([
+        autoCloseResolvedTickets(),
+        reactivatePendingTickets(),
+      ]);
+      if (closedCount > 0) app.log.info(`${closedCount} ticket otomatik kapatıldı`);
+      if (reactivatedCount > 0) app.log.info(`${reactivatedCount} pending ticket yeniden açıldı`);
     } catch (err) {
-      app.log.error(err, 'Otomatik kapatma hatası');
+      app.log.error(err, 'Ticket yaşam döngüsü kontrolü hatası');
     }
-  }, AUTO_CLOSE_INTERVAL);
+  }, LIFECYCLE_CHECK_INTERVAL);
 
   try {
     await app.listen({ port: Number(process.env.PORT) || 3000, host: '0.0.0.0' });

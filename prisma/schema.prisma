@@ -56,7 +56,16 @@ model Ticket {
   firstResponseAt     DateTime?
   firstResponseSlaDue DateTime?
   resolvedAt          DateTime?
+  firstClosedAt       DateTime?
   closedAt            DateTime?
+  lastReopenedAt      DateTime?
+  reopenCount         Int        @default(0)
+  pendingUntil        DateTime?
+  pendingReason       String?
+  lastActivityAt      DateTime   @default(now())
+  followUpOfId        String?
+  followUpOf          Ticket?    @relation("TicketFollowUps", fields: [followUpOfId], references: [id])
+  followUps           Ticket[]   @relation("TicketFollowUps")
   slaDueAt            DateTime?
   slaBreached         Boolean   @default(false)
   createdAt       DateTime  @default(now())
@@ -69,6 +78,8 @@ model Ticket {
   @@index([tenantId, priority])
   @@index([tenantId, assignedToId])
   @@index([tenantId, createdAt])
+  @@index([tenantId, status, pendingUntil])
+  @@index([followUpOfId])
 }
 
 model Comment {

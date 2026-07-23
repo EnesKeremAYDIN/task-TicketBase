@@ -1,6 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getTicket, updateTicketStatus, claimTicket, assignTicket, getComments, createComment } from '../lib/api';
+import {
+  getTicket,
+  updateTicketStatus,
+  confirmResolution,
+  rejectResolution,
+  createFollowUp,
+  claimTicket,
+  assignTicket,
+  getComments,
+  createComment,
+} from '../lib/api';
 import { getAgents } from '../lib/api';
 import type { Ticket as TicketType, Comment, Agent } from '../lib/types';
 import Card from '../components/Card/Card';
@@ -8,6 +18,7 @@ import StatusBadge from '../components/StatusBadge/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge/PriorityBadge';
 import Button from '../components/Button/Button';
 import Textarea from '../components/Textarea/Textarea';
+import Input from '../components/Input/Input';
 import Select from '../components/Select/Select';
 import Modal from '../components/Modal/Modal';
 import Loading from '../components/Loading/Loading';
@@ -23,7 +34,14 @@ function TicketDetail() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const [showPending, setShowPending] = useState(false);
+  const [showReopen, setShowReopen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState('');
+  const [pendingUntil, setPendingUntil] = useState('');
+  const [pendingReason, setPendingReason] = useState('');
+  const [reopenReason, setReopenReason] = useState('');
+  const [resolutionReason, setResolutionReason] = useState('');
+  const [followUpDescription, setFollowUpDescription] = useState('');
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
 
@@ -36,6 +54,7 @@ function TicketDetail() {
   }
   const isAgent = (user as { role?: string }).role === 'agent' || (user as { role?: string }).role === 'admin';
   const isAdmin = (user as { role?: string }).role === 'admin';
+  const isCustomer = (user as { role?: string }).role === 'customer';
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -79,11 +98,83 @@ function TicketDetail() {
   async function handleStatus(newStatus: string) {
     if (!id) return;
     setActionError('');
+    if (newStatus === 'pending') {
+      setShowPending(true);
+      return;
+    }
+    if (ticket?.status === 'closed' && newStatus === 'open') {
+      setShowReopen(true);
+      return;
+    }
     try {
       await updateTicketStatus(id, newStatus);
       load();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'İşlem başarısız');
+    }
+  }
+
+  async function handlePending() {
+    if (!id || !pendingUntil || !pendingReason.trim()) return;
+    setActionError('');
+    try {
+      await updateTicketStatus(id, 'pending', {
+        pendingUntil: new Date(pendingUntil).toISOString(),
+        pendingReason: pendingReason.trim(),
+      });
+      setShowPending(false);
+      setPendingUntil('');
+      setPendingReason('');
+      load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Bekleme işlemi başarısız');
+    }
+  }
+
+  async function handleReopen() {
+    if (!id || !reopenReason.trim()) return;
+    setActionError('');
+    try {
+      await updateTicketStatus(id, 'open', { reason: reopenReason.trim() });
+      setShowReopen(false);
+      setReopenReason('');
+      load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Yeniden açma işlemi başarısız');
+    }
+  }
+
+  async function handleConfirmResolution() {
+    if (!id) return;
+    setActionError('');
+    try {
+      await confirmResolution(id);
+      load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Çözüm onaylanamadı');
+    }
+  }
+
+  async function handleRejectResolution() {
+    if (!id || !resolutionReason.trim()) return;
+    setActionError('');
+    try {
+      await rejectResolution(id, resolutionReason.trim());
+      setResolutionReason('');
+      load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Ticket yeniden açılamadı');
+    }
+  }
+
+  async function handleFollowUp() {
+    if (!id || !followUpDescription.trim()) return;
+    setActionError('');
+    try {
+      const followUp = await createFollowUp(id, followUpDescription.trim());
+      navigate(`/tickets/${followUp.id}`);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Takip ticketı oluşturulamadı');
     }
   }
 
@@ -123,11 +214,16 @@ function TicketDetail() {
     }
   }
 
-  const statusActions: Record<string, string[]> = {
-    new: ['open'],
-    open: ['pending', 'resolved'],
-    pending: ['open'],
-    resolved: ['closed'],
+  const statusActions = ticket.allowedActions.filter((action) => (
+    ['new', 'open', 'pending', 'resolved', 'closed'].includes(action)
+  ));
+
+  const statusActionLabel = (status: string) => {
+    if (status === 'open') return ticket.status === 'closed' ? 'Yeniden Aç' : 'Aç';
+    if (status === 'pending') return 'Beklemeye Al';
+    if (status === 'resolved') return 'Çözüldü';
+    if (status === 'closed') return 'Kapat';
+    return status;
   };
 
   return (
@@ -145,16 +241,25 @@ function TicketDetail() {
           <span>Müşteri: <strong>{ticket.customer?.name}</strong></span>
           <span>Ajan: <strong>{ticket.assignedTo?.name || 'Atanmamış'}</strong></span>
           <span>Oluşturma: <strong>{new Date(ticket.createdAt).toLocaleDateString('tr-TR')}</strong></span>
+          {ticket.pendingUntil && <span>Bekleme Sonu: <strong>{new Date(ticket.pendingUntil).toLocaleString('tr-TR')}</strong></span>}
+          {ticket.reopenCount > 0 && <span>Yeniden Açılma: <strong>{ticket.reopenCount}</strong></span>}
         </div>
+
+        {ticket.pendingReason && <p className={styles.lifecycleInfo}>Bekleme nedeni: {ticket.pendingReason}</p>}
+        {ticket.followUpOf && (
+          <p className={styles.lifecycleInfo}>
+            Takip kaydı: <button className={styles.linkButton} onClick={() => navigate(`/tickets/${ticket.followUpOf?.id}`)}>{ticket.followUpOf.displayId}</button>
+          </p>
+        )}
 
         <p className={styles.ticketDesc}>{ticket.description}</p>
       </Card>
 
       {isAgent && (
         <div className={styles.actionBar}>
-          {statusActions[ticket.status]?.map((s) => (
+          {statusActions.map((s) => (
             <Button key={s} size="sm" onClick={() => handleStatus(s)}>
-              {s === 'open' ? 'Aç' : s === 'pending' ? 'Beklemeye Al' : s === 'resolved' ? 'Çözüldü' : s === 'closed' ? 'Kapat' : s}
+              {statusActionLabel(s)}
             </Button>
           ))}
           {!ticket.assignedTo && (user as { role?: string }).role === 'agent' && (
@@ -180,6 +285,40 @@ function TicketDetail() {
         )}
       </Modal>
 
+      <Modal open={showPending} onClose={() => { setShowPending(false); setActionError(''); }} title="Ticket'ı Beklemeye Al">
+        <Input label="Tekrar Gündeme Gelme Tarihi" type="datetime-local" value={pendingUntil} onChange={(e) => setPendingUntil(e.target.value)} />
+        <Textarea label="Bekleme Nedeni" value={pendingReason} onChange={(e) => setPendingReason(e.target.value)} required />
+        <Button onClick={handlePending} disabled={!pendingUntil || !pendingReason.trim()} style={{ marginTop: 8 }}>Beklemeye Al</Button>
+        {actionError && <p className={styles.actionError}>{actionError}</p>}
+      </Modal>
+
+      <Modal open={showReopen} onClose={() => { setShowReopen(false); setActionError(''); }} title="Kapalı Ticket'ı Yeniden Aç">
+        <Textarea label="Yeniden Açma Nedeni" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} required />
+        <Button onClick={handleReopen} disabled={!reopenReason.trim()} style={{ marginTop: 8 }}>Yeniden Aç</Button>
+        {actionError && <p className={styles.actionError}>{actionError}</p>}
+      </Modal>
+
+      {isCustomer && ticket.allowedActions.includes('confirm_resolution') && (
+        <Card title="Çözüm Onayı" style={{ marginTop: 16 }}>
+          <p className={styles.lifecycleInfo}>Sorununuz çözüldüyse ticket'ı kapatabilir, devam ediyorsa yeniden açabilirsiniz.</p>
+          <Textarea label="Sorun devam ediyorsa açıklayın" value={resolutionReason} onChange={(e) => setResolutionReason(e.target.value)} />
+          <div className={styles.formActions}>
+            <Button onClick={handleConfirmResolution}>Çözümü Onayla</Button>
+            <Button variant="secondary" onClick={handleRejectResolution} disabled={!resolutionReason.trim()}>Sorun Devam Ediyor</Button>
+          </div>
+          {actionError && <p className={styles.actionError}>{actionError}</p>}
+        </Card>
+      )}
+
+      {isCustomer && ticket.allowedActions.includes('create_follow_up') && (
+        <Card title="Yeni Takip Ticket'ı" style={{ marginTop: 16 }}>
+          <p className={styles.lifecycleInfo}>Bu ticket kapalıdır. Yeni mesajınız ayrı bir ticket olarak oluşturulup bu kayda bağlanacaktır.</p>
+          <Textarea label="Yeni Talebiniz" value={followUpDescription} onChange={(e) => setFollowUpDescription(e.target.value)} required />
+          <Button onClick={handleFollowUp} disabled={!followUpDescription.trim()} style={{ marginTop: 8 }}>Takip Ticket'ı Oluştur</Button>
+          {actionError && <p className={styles.actionError}>{actionError}</p>}
+        </Card>
+      )}
+
       <Card title="Yorumlar" style={{ marginTop: 16 }}>
         {comments.length === 0 ? (
           <p className={styles.commentEmpty}>Henüz yorum yok.</p>
@@ -196,16 +335,18 @@ function TicketDetail() {
           ))
         )}
 
-        <form onSubmit={handleComment} className={styles.commentForm}>
-          <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Yorumunuz..." required />
-          {isAgent && (
-            <Select value={commentType} onChange={(e) => setCommentType(e.target.value)} options={[
-              { value: 'public_reply', label: 'Genel Yanıt' },
-              { value: 'internal_note', label: 'İç Not' },
-            ]} />
-          )}
-          <Button type="submit" style={{ marginTop: 4 }}>Gönder</Button>
-        </form>
+        {(ticket.status !== 'closed' || isAdmin) && (
+          <form onSubmit={handleComment} className={styles.commentForm}>
+            <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Yorumunuz..." required />
+            {isAgent && (
+              <Select value={commentType} onChange={(e) => setCommentType(e.target.value)} options={[
+                { value: 'public_reply', label: 'Genel Yanıt' },
+                { value: 'internal_note', label: 'İç Not' },
+              ]} />
+            )}
+            <Button type="submit" style={{ marginTop: 4 }}>Gönder</Button>
+          </form>
+        )}
       </Card>
     </div>
   );

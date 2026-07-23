@@ -111,7 +111,16 @@ async function validateSeed(): Promise<void> {
   const expectedTicketCount = TENANTS.length * TICKETS_PER_TENANT;
   const expectedCommentCount = TENANTS.length * COMMENTS_PER_TENANT;
 
-  const [userCount, ticketCount, commentCount, uncategorizedCount, missingSlaCount, categoryGroups] = await Promise.all([
+  const [
+    userCount,
+    ticketCount,
+    commentCount,
+    uncategorizedCount,
+    missingSlaCount,
+    pendingWithoutReminderCount,
+    reopenedTicketCount,
+    categoryGroups,
+  ] = await Promise.all([
     prisma.user.count(),
     prisma.ticket.count(),
     prisma.comment.count(),
@@ -124,6 +133,8 @@ async function validateSeed(): Promise<void> {
         ],
       },
     }),
+    prisma.ticket.count({ where: { status: 'pending', pendingUntil: null } }),
+    prisma.ticket.count({ where: { reopenCount: { gt: 0 } } }),
     prisma.ticket.groupBy({ by: ['category'] }),
   ]);
 
@@ -136,6 +147,8 @@ async function validateSeed(): Promise<void> {
     commentCount === expectedCommentCount ? null : `Yorum sayısı ${commentCount}; beklenen ${expectedCommentCount}`,
     uncategorizedCount === 0 ? null : `${uncategorizedCount} ticket kategorisiz`,
     missingSlaCount === 0 ? null : `${missingSlaCount} ticket'ın SLA tarihi eksik`,
+    pendingWithoutReminderCount === 0 ? null : `${pendingWithoutReminderCount} pending ticket'ın reminder tarihi eksik`,
+    reopenedTicketCount > 0 ? null : 'Yeniden açılma geçmişi olan örnek ticket yok',
     missingCategories.length === 0 ? null : `Eksik kategoriler: ${missingCategories.join(', ')}`,
   ].filter((error): error is string => error !== null);
 
@@ -243,6 +256,23 @@ async function main() {
         const createdAt = randomDate(new Date('2025-01-01'), new Date('2026-06-01'));
         const title = generateTitle(category);
         const deadlines = calculateSLADeadlineValues(createdAt, SLA_CONFIG[priority], holidayDates);
+        const isReopened = status === 'open' && number % 50 === 0;
+        const resolvedAt = ['resolved', 'closed'].includes(status) || isReopened
+          ? new Date(createdAt.getTime() + 2 * 24 * 60 * 60 * 1000)
+          : null;
+        const closedAt = status === 'closed'
+          ? new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000)
+          : null;
+        const firstClosedAt = isReopened
+          ? new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000)
+          : closedAt;
+        const lastReopenedAt = isReopened
+          ? new Date(createdAt.getTime() + 8 * 24 * 60 * 60 * 1000)
+          : null;
+        const pendingUntil = status === 'pending'
+          ? new Date(Date.UTC(2026, 11, 1 + (number % 28), 9, 0, 0))
+          : null;
+        const lastActivityAt = lastReopenedAt || closedAt || resolvedAt || createdAt;
 
         tickets.push({
           tenantId: tenant.id,
@@ -255,6 +285,14 @@ async function main() {
           category,
           customerId,
           assignedToId,
+          resolvedAt,
+          firstClosedAt,
+          closedAt: closedAt || firstClosedAt,
+          lastReopenedAt,
+          reopenCount: isReopened ? 1 : 0,
+          pendingUntil,
+          pendingReason: status === 'pending' ? 'Müşteriden ek bilgi bekleniyor' : null,
+          lastActivityAt,
           firstResponseSlaDue: deadlines.firstResponseSlaDue,
           slaDueAt: deadlines.slaDueAt,
           createdAt,

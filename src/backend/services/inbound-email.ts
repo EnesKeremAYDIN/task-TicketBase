@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma';
 import { createTicket } from './ticket';
+import { createComment } from './comment';
 import { ValidationError, NotFoundError } from '../lib/errors';
 
 interface InboundPayload {
@@ -62,17 +63,45 @@ export async function processInboundEmail(payload: InboundPayload) {
         throw new ValidationError('Gönderen e-posta ticket sahibiyle eşleşmiyor');
       }
 
-      const comment = await prisma.comment.create({
-        data: {
-          ticketId: ticket.id,
-          authorId: customer.id,
-          type: 'public_reply',
-          body: payload.body,
-        },
-      });
+      if (ticket.status === 'closed') {
+        const followUpTicket = await createTicket(
+          {
+            title: `Takip: ${ticket.title}`,
+            description: payload.body,
+            priority: ticket.priority,
+            category: ticket.category || undefined,
+            followUpOfId: ticket.id,
+          },
+          customer.id,
+          tenant.id,
+          tenant.slug,
+        );
+
+        await updateInboundStatus(inboundMessage.id, 'processed', followUpTicket.id);
+        return {
+          status: 'processed',
+          message: 'Kapalı ticket için yeni takip ticketı oluşturuldu',
+          ticketId: followUpTicket.id,
+          followUpOfId: ticket.id,
+        };
+      }
+
+      const comment = await createComment(
+        ticket.id,
+        customer.id,
+        'customer',
+        tenant.id,
+        'public_reply',
+        payload.body,
+      );
 
       await updateInboundStatus(inboundMessage.id, 'processed', ticket.id);
-      return { status: 'processed', message: 'Yorum eklendi', ticketId: ticket.id, commentId: comment.id };
+      return {
+        status: 'processed',
+        message: ['pending', 'resolved'].includes(ticket.status) ? 'Yorum eklendi ve ticket yeniden açıldı' : 'Yorum eklendi',
+        ticketId: ticket.id,
+        commentId: comment.id,
+      };
     }
 
     const customer = await prisma.user.findFirst({
