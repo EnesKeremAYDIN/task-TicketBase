@@ -1,6 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { processInboundEmail } from '../services/inbound-email';
+import {
+  processInboundEmail,
+  recordInvalidInboundMessage,
+} from '../services/inbound-email';
 import { ValidationError, ForbiddenError } from '../lib/errors';
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'ticketbase-webhook-secret';
@@ -23,6 +26,10 @@ export async function inboundEmailRoutes(app: FastifyInstance): Promise<void> {
     const parsed = inboundSchema.safeParse(request.body);
 
     if (!parsed.success) {
+      const validationMessage = parsed.error.errors
+        .map((issue) => `${issue.path.join('.') || 'payload'}: ${issue.message}`)
+        .join('; ');
+      await recordInvalidInboundMessage(request.body, validationMessage);
       throw new ValidationError(parsed.error.errors[0].message);
     }
 

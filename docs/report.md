@@ -38,7 +38,7 @@ Spec'te belirtilen tüm entity'ler `prisma/schema.prisma`'da tanımlandı:
 | Comment | public_reply / internal_note | ✅ `type` ile ayrım, tenant scope'lu |
 | TicketActivity | actor, source, field, old/new value, reason, visibility | ✅ Transaction içi immutable audit kaydı, tenant scope'lu |
 | SLAPolicy | Öncelik bazlı SLA hedefleri | ✅ `@@unique([tenantId, priority])` |
-| InboundMessage | Webhook mesaj kaydı, dedup | ✅ `messageId` @unique |
+| InboundMessage | Webhook mesaj kaydı, dedup ve retry | ✅ Nullable payload alanları, `messageId`/`dedupKey` unique, deneme ve hata bilgileri |
 | Holiday | Tatil günleri | ✅ `@@unique([tenantId, date])` |
 
 Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontrollü yeniden açılma desteklenir
@@ -100,12 +100,13 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 |-------|----------|
 | Mock mail servisi | `src/mock-mail-channel/` → Fastify, port 4000 |
 | Webhook endpoint | `POST /api/webhook/inbound-email`, `x-webhook-secret` ile korumalı |
-| Konuda aktif numara varsa → yorum | Regex `/[A-Z]+-(\d+)/i` ile eşleştirme; pending/resolved ticket açılır |
-| Konuda kapalı numara varsa → follow-up | Eski ticket'a bağlı yeni ticket oluşturulur |
-| Konuda numara yoksa → yeni ticket | `createTicket()` servisine yönlendirme |
+| Konuda aktif numara varsa → yorum | Prefix ve numara birlikte ayrıştırılır; prefix tenant ile doğrulanır, pending/resolved ticket açılır |
+| Konuda kapalı numara varsa → follow-up | Web akışıyla ortak `createFollowUpTicket()` servisi üzerinden bağlı yeni ticket oluşturulur |
+| Konuda numara yoksa → yeni ticket | Transaction uyumlu ortak ticket servisine yönlendirme |
 | Payload validasyonu | Zod schema: `messageId`, `tenant`, `from` (email), `body` (min 1) |
-| Duplicate koruma | `InboundMessage.messageId` @unique + `P2002` exception yakalama |
-| Bozuk payload loglama | `InboundMessage.status='failed'` + `raw` JSON kaydı |
+| Duplicate koruma | `messageId` veya ham payload hash'inden `dedupKey`; paralel isteklerde atomik sahiplenme |
+| Yarım kalan işlem | Ticket/yorum ve `processed` güncellemesi aynı transaction'da; 24 saatlik pencerede eski `processing` kaydı 5 dakika sonra tekrar sahiplenilir |
+| Bozuk payload loglama | Eksik kolonlar nullable; `status='failed'`, `raw`, `validationError` ve deneme bilgisi saklanır |
 
 ### FR-06 — SLA Takibi
 
@@ -185,7 +186,7 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 |-------|-------|
 | TypeScript strict: true | ✅ `tsconfig.json`'da tanımlı |
 | any kullanımı gerekçelendirilmeli | ✅ Minimal, tip dönüşümleri `as` ile |
-| Birim testleri | ✅ **105 test** (SLA ihlal türleri, yanıtsız çözüm, dashboard/kuyruklar, activity/audit, bulk işlemler, yaşam döngüsü, state machine, numbering, kategori, webhook, visibility) |
+| Birim testleri | ✅ **108 test** (SLA ihlal türleri, yanıtsız çözüm, dashboard/kuyruklar, activity/audit, bulk işlemler, yaşam döngüsü, state machine, numbering, kategori, webhook, visibility) |
 | Lint temiz | ✅ `npm run lint` 0 hata |
 
 ### NFR-05 — Zaman Yönetimi
@@ -226,7 +227,7 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Test | Sonuç |
 |------|-------|
 | `npm run lint` | ✅ **0 hata** |
-| `npm test` | ✅ **105/105 geçti** (9 dosya) |
+| `npm test` | ✅ **108/108 geçti** (9 dosya) |
 | `npm run race-test` | ✅ 20/20 benzersiz, 1/10 claim |
 | `npm run isolation-test` | ✅ 9/9 sıfır sızıntı |
 | `npm run perf` | ✅ Liste P95: **6ms**, Dashboard P95: **65ms** |

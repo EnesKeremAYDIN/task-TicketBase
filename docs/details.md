@@ -87,7 +87,10 @@
 - Konuda kapalı ticket numarası varsa → eski kayda bağlı yeni follow-up ticket aç
 - Konuda ticket numarası yoksa → yeni ticket aç
 - **Gelen her veri doğrulanmalı** — bozuk payload sistemi düşürmemeli, kayıt altına alınmalı
+- Ticket prefix'i payload tenant'ıyla aynı olmalı; farklı tenant prefix'iyle gelen referans reddedilir
 - **Duplicate teslim önlenmeli** — aynı mesaj iki kez işlenemez
+- Ticket/yorum yan etkisi ile inbound mesajın `processed` durumu aynı transaction içinde tamamlanır
+- Yarım kalan `processing` mesajı 24 saatlik retry penceresi içinde, 5 dakikalık sahiplik süresi dolunca aynı `messageId` ile yeniden denenebilir
 
 ### FR-06 — SLA Takibi
 - Her ticket için önceliğe göre ilk yanıt ve çözüm son tarihleri hesaplanır

@@ -137,7 +137,9 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 ### Diğer
 - `GET /api/agents` — Ajan listesi (agent/admin)
 - `GET /api/rules` — İşletim kuralları (admin)
-- `POST /api/webhook/inbound-email` — Webhook (mock mail, `x-webhook-secret` header gerekli)
+- `POST /api/webhook/inbound-email` — Webhook (mock mail, `x-webhook-secret` header gerekli). Bozuk payload'lar ham içerik ve doğrulama hatasıyla kaydedilir; ticket prefix'i tenant ile doğrulanır.
+
+Webhook işlemleri `InboundMessage` üzerinde `processing`, `processed` ve `failed` durumlarıyla izlenir. Ticket/yorum oluşturma ile mesajın tamamlanması aynı transaction içinde yapılır. Yarım kalan `processing` kaydı, 24 saatlik retry penceresi içinde 5 dakikalık sahiplik süresi dolduktan sonra aynı `messageId` ile güvenli biçimde yeniden denenebilir.
 
 ## Seed Verisi
 
@@ -155,11 +157,11 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 
 ## Test Sonuçları
 
-### Birim Testleri (`npm test`) — 105/105 ✅
+### Birim Testleri (`npm test`) — 108/108 ✅
 
 ```
 Test Files  9 passed (9)
-     Tests  105 passed (105)
+     Tests  108 passed (108)
 ```
 
 | Test Dosyası | Test Sayısı | Kapsam |
@@ -171,7 +173,7 @@ Test Files  9 passed (9)
 | bulk-ticket.test.ts | 9 | Rol yetkileri, state machine, SLA yeniden hesaplama, ajan atama, tenant izolasyonu, 100 kayıt limiti |
 | activity.test.ts | 8 | Actor/zaman, eski-yeni değer, görünürlük, otomatik işlemler, tenant izolasyonu |
 | queue.test.ts | 9 | Aktif dashboard kapsamı, My Tickets, Unassigned & Open, Escalated, rol yetkileri ve filtre uyumu |
-| inbound-email.test.ts | 8 | Webhook, duplicate, validation |
+| inbound-email.test.ts | 11 | Webhook, bozuk payload kaydı, tenant prefix kontrolü, duplicate ve yarım kalan işlem retry akışı |
 | extended.test.ts | 16 | Cross-tenant, race, pagination, SLA boundary, search |
 
 ### Performans (`npm run perf`)

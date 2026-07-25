@@ -10,7 +10,6 @@ import {
 } from '../lib/state-machine';
 import { tenantFilter } from '../lib/tenant-context';
 import {
-  calculateSLADeadlines,
   calculateTenantSLADeadlineValues,
   isFirstResponseSlaBreached,
   isResolutionSlaBreached,
@@ -57,65 +56,94 @@ export async function createTicket(
   tenantSlug: string,
   source: TicketActivitySource = 'web',
 ) {
-  const ticket = await prisma.$transaction(async (tx) => {
-    const counter = await tx.ticketCounter.upsert({
-      where: { tenantId },
-      create: { tenantId, lastNumber: 1 },
-      update: { lastNumber: { increment: 1 } },
+  return prisma.$transaction((tx) => createTicketInTransaction(
+    tx,
+    data,
+    customerId,
+    tenantId,
+    tenantSlug,
+    source,
+  ));
+}
+
+export function getTenantTicketPrefix(tenantSlug: string) {
+  return tenantSlug.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+}
+
+export async function createTicketInTransaction(
+  tx: Prisma.TransactionClient,
+  data: CreateTicketData,
+  customerId: string,
+  tenantId: string,
+  tenantSlug: string,
+  source: TicketActivitySource = 'web',
+) {
+  const counter = await tx.ticketCounter.upsert({
+    where: { tenantId },
+    create: { tenantId, lastNumber: 1 },
+    update: { lastNumber: { increment: 1 } },
+  });
+
+  const displayId = `${getTenantTicketPrefix(tenantSlug)}-${counter.lastNumber}`;
+
+  const createdTicket = await tx.ticket.create({
+    data: {
+      tenantId,
+      number: counter.lastNumber,
+      displayId,
+      title: data.title,
+      description: data.description,
+      status: 'new',
+      priority: data.priority || 'normal',
+      category: data.category || null,
+      customerId,
+      followUpOfId: data.followUpOfId || null,
+    },
+    include: {
+      customer: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  const deadlines = await calculateTenantSLADeadlineValues(
+    tenantId,
+    createdTicket.priority,
+    createdTicket.createdAt,
+    tx,
+  );
+  if (deadlines) {
+    await tx.ticket.update({
+      where: { id: createdTicket.id },
+      data: deadlines,
     });
+  }
 
-    const displayId = `${tenantSlug.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-${counter.lastNumber}`;
+  await recordTicketActivity(tx, {
+    tenantId,
+    ticketId: createdTicket.id,
+    actorId: customerId,
+    type: 'ticket_created',
+    field: 'status',
+    newValue: 'new',
+    source,
+    visibility: 'public',
+    createdAt: createdTicket.createdAt,
+  });
 
-    const createdTicket = await tx.ticket.create({
-      data: {
-        tenantId,
-        number: counter.lastNumber,
-        displayId,
-        title: data.title,
-        description: data.description,
-        status: 'new',
-        priority: data.priority || 'normal',
-        category: data.category || null,
-        customerId,
-        followUpOfId: data.followUpOfId || null,
-      },
-      include: {
-        customer: { select: { id: true, name: true, email: true } },
-      },
-    });
-
+  if (data.followUpOfId) {
     await recordTicketActivity(tx, {
       tenantId,
-      ticketId: createdTicket.id,
+      ticketId: data.followUpOfId,
       actorId: customerId,
-      type: 'ticket_created',
-      field: 'status',
-      newValue: 'new',
+      type: 'follow_up_created',
+      newValue: createdTicket.id,
+      newLabel: createdTicket.displayId,
       source,
       visibility: 'public',
       createdAt: createdTicket.createdAt,
     });
+  }
 
-    if (data.followUpOfId) {
-      await recordTicketActivity(tx, {
-        tenantId,
-        ticketId: data.followUpOfId,
-        actorId: customerId,
-        type: 'follow_up_created',
-        newValue: createdTicket.id,
-        newLabel: createdTicket.displayId,
-        source,
-        visibility: 'public',
-        createdAt: createdTicket.createdAt,
-      });
-    }
-
-    return createdTicket;
-  });
-
-  await calculateSLADeadlines(ticket.id, tenantId);
-
-  return ticket;
+  return { ...createdTicket, ...deadlines };
 }
 
 export async function listTickets(params: ListTicketsParams) {
@@ -358,10 +386,38 @@ export async function createFollowUpTicket(
   tenantSlug: string,
   customerId: string,
   description: string,
+  source: TicketActivitySource = 'web',
 ) {
-  const ticket = await requireTicketOwnerWithStatus(ticketId, tenantId, customerId, 'closed');
+  return prisma.$transaction((tx) => createFollowUpTicketInTransaction(
+    tx,
+    ticketId,
+    tenantId,
+    tenantSlug,
+    customerId,
+    description,
+    source,
+  ));
+}
 
-  return createTicket(
+export async function createFollowUpTicketInTransaction(
+  tx: Prisma.TransactionClient,
+  ticketId: string,
+  tenantId: string,
+  tenantSlug: string,
+  customerId: string,
+  description: string,
+  source: TicketActivitySource = 'web',
+) {
+  const ticket = await requireTicketOwnerWithStatus(
+    ticketId,
+    tenantId,
+    customerId,
+    'closed',
+    tx,
+  );
+
+  return createTicketInTransaction(
+    tx,
     {
       title: `Takip: ${ticket.title}`,
       description,
@@ -372,6 +428,7 @@ export async function createFollowUpTicket(
     customerId,
     tenantId,
     tenantSlug,
+    source,
   );
 }
 
@@ -380,8 +437,9 @@ async function requireTicketOwnerWithStatus(
   tenantId: string,
   customerId: string,
   status: string,
+  db: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
-  const ticket = await prisma.ticket.findFirst({
+  const ticket = await db.ticket.findFirst({
     where: { id: ticketId, tenantId, customerId },
   });
 

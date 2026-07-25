@@ -143,19 +143,28 @@ model SLAPolicy {
 }
 
 model InboundMessage {
-  id        String   @id @default(cuid())
-  tenantId  String?
-  messageId String   @unique
-  fromEmail String
-  subject   String?
-  body      String
-  raw       String
-  status    String
-  ticketId  String?
-  createdAt DateTime @default(now())
+  id              String    @id @default(cuid())
+  tenantId        String?
+  tenantSlug      String?
+  messageId       String?   @unique
+  dedupKey        String?   @unique
+  fromEmail       String?
+  subject         String?
+  body            String?
+  raw             String
+  status          String
+  ticketId        String?
+  commentId       String?
+  attemptCount    Int       @default(0)
+  lastAttemptAt   DateTime?
+  processedAt     DateTime?
+  validationError String?
+  errorMessage    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
 
-  @@index([messageId])
   @@index([status])
+  @@index([tenantId, status])
 }
 
 model TicketCounter {

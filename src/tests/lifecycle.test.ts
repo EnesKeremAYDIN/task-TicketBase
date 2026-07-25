@@ -310,6 +310,14 @@ describe('Ticket Yaşam Döngüsü', () => {
     const followUp = await prisma.ticket.findUnique({ where: { id: body.ticketId } });
     expect(followUp?.followUpOfId).toBe(ticket.id);
     expect(followUp?.customerId).toBe(customerId);
+    const followUpActivity = await prisma.ticketActivity.findFirst({
+      where: {
+        ticketId: ticket.id,
+        type: 'follow_up_created',
+        newValue: body.ticketId,
+      },
+    });
+    expect(followUpActivity?.source).toBe('email');
   });
 
   it('müşteri yorumu ilk agent yanıtı olarak sayılmamalı', async () => {

@@ -75,3 +75,9 @@ Dashboard metriklerinde aktif ticket tanımı `new`, `open` ve `pending` durumla
 İlk yanıt ve çözüm SLA ihlalleri ayrı boolean alanlarda saklanır. Mevcut `slaBreached` alanı dashboard, ihlal listesi ve `Escalated` kuyruğuyla geriye uyumluluk için iki türün toplam sonucu olarak korunur.
 
 **Karar:** Dashboard isteğine bağlı ihlal hesabı tek başına yeterli görülmedi. İlk agent/admin genel yanıtında ilk yanıt ihlali, `resolved` geçişinde çözüm ihlali aynı transaction içinde hesaplanır. Periyodik tarama yalnızca henüz olay gerçekleşmemiş ticket'lar için güvenlik ağıdır. Müşteri yorumu ilk yanıt sayılmaz; her yorum `lastActivityAt` değerini güncellediği için otomatik kapanma gerçek hareketsizliğe göre çalışır.
+
+## 2026-07-26 — Webhook Hata Kaydı ve Güçlendirilmiş Idempotency
+
+Zod doğrulamasından geçmeyen webhook payload'ları zorunlu alanları eksik olsa da ham içerik, doğrulama hatası ve bulunabilen kısmi alanlarla `InboundMessage` tablosunda saklanır. Sağlayıcı `messageId` göndermediyse aynı bozuk payload'ın tekrarını ayırt etmek için ham içeriğin SHA-256 hash'i kullanılır. Ticket referansındaki prefix payload tenant'ıyla uyuşmuyorsa mesaj reddedilir.
+
+**Karar:** Yalnızca unique `messageId` hatasında `duplicate` dönmek yarım kalan işlemi iyileştirmediği için yeterli görülmedi. Mesajlar deneme sayısı ve son deneme zamanıyla atomik olarak sahiplenilir. Ticket, yorum veya follow-up oluşturma ile inbound kaydının `processed` yapılması aynı transaction içinde tamamlanır. Beş dakikadan uzun süre `processing` kalan veya `failed` olan mesaj, işletim kuralındaki 24 saatlik retry penceresi içinde aynı kimlikle yeniden denenebilir. Kapalı ticket e-postası web akışıyla aynı follow-up servisini kullanır.

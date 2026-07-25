@@ -58,11 +58,11 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
 ## Aşama 4 — Mock E-posta Kanalı
 
 - [ ] `mock-mail-channel` servisini oluştur (webhook gönderen simülatör)
-- [ ] Webhook alıcı endpoint: payload doğrulama
-- [ ] Konu satırında ticket numarası varsa → Comment olarak ekle
-- [ ] Konu satırında ticket numarası yoksa → yeni Ticket oluştur
-- [ ] Duplicate koruma: InboundMessage.message_id veya hash ile aynı mesajı iki kez işleme
-- [ ] Hatalı/bozuk payload'ları InboundMessage olarak logla, sistemi düşürme
+- [x] Webhook alıcı endpoint: payload doğrulama
+- [x] Konu satırında tenant prefix'i doğrulanmış ticket numarası varsa → Comment olarak ekle
+- [x] Konu satırında ticket numarası yoksa → yeni Ticket oluştur
+- [x] Duplicate ve yarım kalan işlem koruması: `messageId` veya ham payload hash'iyle atomik sahiplenme
+- [x] Hatalı/bozuk payload'ları nullable alanlar, ham içerik ve doğrulama hatasıyla `InboundMessage` olarak logla
 
 ---
 

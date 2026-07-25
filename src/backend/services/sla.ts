@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { addBusinessMinutes } from '../lib/business-hours';
 import { ACTIVE_TICKET_STATUSES, type TicketRole } from '../lib/state-machine';
@@ -48,12 +49,13 @@ export async function calculateTenantSLADeadlineValues(
   tenantId: string,
   priority: string,
   startAt: Date,
+  db: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
   const [slaPolicy, holidays] = await Promise.all([
-    prisma.sLAPolicy.findUnique({
+    db.sLAPolicy.findUnique({
       where: { tenantId_priority: { tenantId, priority } },
     }),
-    prisma.holiday.findMany({
+    db.holiday.findMany({
       where: { tenantId },
       select: { date: true },
     }),
@@ -66,23 +68,6 @@ export async function calculateTenantSLADeadlineValues(
     slaPolicy,
     holidays.map((holiday) => holiday.date),
   );
-}
-
-export async function calculateSLADeadlines(ticketId: string, tenantId: string): Promise<void> {
-  const ticket = await prisma.ticket.findUnique({
-    where: { id: ticketId },
-    select: { id: true, priority: true, createdAt: true, tenantId: true },
-  });
-
-  if (!ticket) return;
-
-  const deadlines = await calculateTenantSLADeadlineValues(tenantId, ticket.priority, ticket.createdAt);
-  if (!deadlines) return;
-
-  await prisma.ticket.update({
-    where: { id: ticketId },
-    data: deadlines,
-  });
 }
 
 export async function markBreachedTickets(tenantId?: string): Promise<number> {
