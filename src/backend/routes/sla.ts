@@ -6,7 +6,7 @@ export async function slaRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/sla/dashboard', async (request, _reply) => {
     const user = requireRole(request, ['agent', 'admin']);
     await markBreachedTickets(user.tenantId);
-    const stats = await getDashboardStats(user.tenantId);
+    const stats = await getDashboardStats(user.tenantId, user.id, user.role);
     return stats;
   });
 

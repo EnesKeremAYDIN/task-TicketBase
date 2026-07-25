@@ -2,6 +2,8 @@ import { ValidationError } from './errors';
 
 export const TICKET_STATUSES = ['new', 'open', 'pending', 'resolved', 'closed'] as const;
 export type TicketStatus = typeof TICKET_STATUSES[number];
+export const ACTIVE_TICKET_STATUSES = ['new', 'open', 'pending'] as const;
+export type TicketQueue = 'my' | 'unassigned' | 'escalated';
 export type TicketRole = 'admin' | 'agent' | 'customer';
 export type TicketAction = TicketStatus | 'confirm_resolution' | 'reject_resolution' | 'create_follow_up';
 

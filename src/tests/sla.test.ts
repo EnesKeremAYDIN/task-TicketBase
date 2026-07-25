@@ -11,7 +11,7 @@ import { slaRoutes } from '../backend/routes/sla';
 import { inboundEmailRoutes } from '../backend/routes/inbound-email';
 import { AppError } from '../backend/lib/errors';
 import { addBusinessMinutes, nextBusinessMinute } from '../backend/lib/business-hours';
-import { calculateSLADeadlineValues } from '../backend/services/sla';
+import { calculateSLADeadlineValues, markBreachedTickets } from '../backend/services/sla';
 import prisma from '../backend/lib/prisma';
 
 async function buildApp() {
@@ -105,12 +105,14 @@ describe('Comment Routes', () => {
   let agentToken: string;
   let agentId: string;
   let ticketId: string;
+  let tenantId: string;
 
   beforeAll(async () => {
     app = await buildApp();
 
     const customer = await loginAs(app, 'musteri1@acme.com');
     customerToken = customer.token;
+    tenantId = customer.user.tenant.id;
 
     const agent = await loginAs(app, 'agent1@acme.com');
     agentToken = agent.token;
@@ -222,6 +224,130 @@ describe('Comment Routes', () => {
     expect(ticket.firstResponseAt).toBeDefined();
     expect(ticket.status).toBe('open');
   });
+
+  it('geç ilk agent yanıtında ilk yanıt SLA ihlalini anında işaretlemeli', async () => {
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/tickets',
+      headers: { authorization: `Bearer ${customerToken}` },
+      payload: { title: 'Geç ilk yanıt testi', description: 'Test' },
+    });
+    const newTicketId = JSON.parse(createResponse.body).id;
+    await prisma.ticket.update({
+      where: { id: newTicketId },
+      data: { firstResponseSlaDue: new Date(Date.now() - 60 * 1000) },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/tickets/${newTicketId}/comments`,
+      headers: { authorization: `Bearer ${agentToken}` },
+      payload: { type: 'public_reply', body: 'Gecikmiş ilk yanıt' },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: newTicketId } });
+    expect(ticket.firstResponseAt).not.toBeNull();
+    expect(ticket.firstResponseSlaBreached).toBe(true);
+    expect(ticket.resolutionSlaBreached).toBe(false);
+    expect(ticket.slaBreached).toBe(true);
+  });
+
+  it('geç çözümde çözüm SLA ihlalini resolved anında işaretlemeli', async () => {
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/tickets',
+      headers: { authorization: `Bearer ${customerToken}` },
+      payload: { title: 'Geç çözüm testi', description: 'Test' },
+    });
+    const newTicketId = JSON.parse(createResponse.body).id;
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/tickets/${newTicketId}/status`,
+      headers: { authorization: `Bearer ${agentToken}` },
+      payload: { status: 'open' },
+    });
+    await prisma.ticket.update({
+      where: { id: newTicketId },
+      data: { slaDueAt: new Date(Date.now() - 60 * 1000) },
+    });
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/tickets/${newTicketId}/status`,
+      headers: { authorization: `Bearer ${agentToken}` },
+      payload: { status: 'resolved' },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: newTicketId } });
+    expect(ticket.resolvedAt).not.toBeNull();
+    expect(ticket.firstResponseSlaBreached).toBe(false);
+    expect(ticket.resolutionSlaBreached).toBe(true);
+    expect(ticket.slaBreached).toBe(true);
+  });
+
+  it('agent yanıt vermeden çözerse geçmiş ilk yanıt deadlineını ihlal olarak kaydetmeli', async () => {
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/tickets',
+      headers: { authorization: `Bearer ${customerToken}` },
+      payload: { title: 'Yanıtsız çözüm testi', description: 'Test' },
+    });
+    const newTicketId = JSON.parse(createResponse.body).id;
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/tickets/${newTicketId}/status`,
+      headers: { authorization: `Bearer ${agentToken}` },
+      payload: { status: 'open' },
+    });
+    await prisma.ticket.update({
+      where: { id: newTicketId },
+      data: {
+        firstResponseSlaDue: new Date(Date.now() - 60 * 1000),
+        slaDueAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/tickets/${newTicketId}/status`,
+      headers: { authorization: `Bearer ${agentToken}` },
+      payload: { status: 'resolved' },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: newTicketId } });
+    expect(ticket.firstResponseAt).toBeNull();
+    expect(ticket.firstResponseSlaBreached).toBe(true);
+    expect(ticket.resolutionSlaBreached).toBe(false);
+    expect(ticket.slaBreached).toBe(true);
+  });
+
+  it('periyodik tarama ilk yanıt ve çözüm ihlallerini ayrı işaretlemeli', async () => {
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/tickets',
+      headers: { authorization: `Bearer ${customerToken}` },
+      payload: { title: 'SLA tür tarama testi', description: 'Test' },
+    });
+    const newTicketId = JSON.parse(createResponse.body).id;
+    const overdueAt = new Date(Date.now() - 60 * 1000);
+    await prisma.ticket.update({
+      where: { id: newTicketId },
+      data: {
+        firstResponseSlaDue: overdueAt,
+        slaDueAt: overdueAt,
+      },
+    });
+
+    await markBreachedTickets(tenantId);
+
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: newTicketId } });
+    expect(ticket.firstResponseSlaBreached).toBe(true);
+    expect(ticket.resolutionSlaBreached).toBe(true);
+    expect(ticket.slaBreached).toBe(true);
+  });
 });
 
 describe('SLA Dashboard', () => {
@@ -249,6 +375,10 @@ describe('SLA Dashboard', () => {
     expect(body.statusBreakdown).toBeDefined();
     expect(body.priorityBreakdown).toBeDefined();
     expect(body.slaBreached).toBeDefined();
+    expect(body.slaBreachBreakdown).toEqual(expect.objectContaining({
+      firstResponse: expect.any(Number),
+      resolution: expect.any(Number),
+    }));
   });
 
   it('high önceliğin ilk yanıt hedefi 4 saat olmalı', async () => {

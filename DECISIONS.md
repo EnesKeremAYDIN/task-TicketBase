@@ -57,3 +57,21 @@ Lineer durum makinesi gerçek destek akışlarında yetersiz kaldığı için ro
 Agent ve admin kullanıcıları ticket listesindeki mevcut sayfadan en fazla 100 kayıt seçerek durum, öncelik ve sahiplik işlemi yapabilir. Toplu durum değişiklikleri mevcut rol duyarlı state machine üzerinden yürür; öncelik değişikliğinde SLA tarihleri yeniden hesaplanır. Agent yalnızca atanmamış ticket'ları kendine alabilir, admin herhangi bir ajana atama yapabilir veya atamayı kaldırabilir.
 
 **Karar:** Filtreye uyan tüm kayıtları sunucu tarafında sınırsız güncellemek yerine yalnızca açık sayfadaki seçili ID'ler kabul edildi. Her ticket tenant ve yetki kurallarına göre ayrı değerlendirilir; uygun kayıtlar güncellenirken başarısız kayıtlar nedenleriyle döner. Böylece tek hatalı ticket bütün işlemi durdurmaz ve büyük, geri alınması zor güncellemeler önlenir.
+
+## 2026-07-24 — Ticket Aktivite Geçmişi ve Audit Modeli
+
+Yorumlar kullanıcı iletişimini temsil etmeye devam ederken durum, öncelik, atama, takip ve oluşturma olayları ayrı `TicketActivity` kayıtlarında tutulur. Her kayıt tenant, ticket, actor, kaynak, eski/yeni değer, neden, görünürlük ve zaman bilgisi taşır. Sistem işlemlerinde actor boş bırakılır ve kaynak `system` olur.
+
+**Karar:** Operasyon geçmişini metin tabanlı `internal_note` kayıtlarından çıkarmak yerine yorum metnini parse etmek güvenilir olmadığı için reddedildi. Ticket değişikliği ile activity kaydı aynı transaction içinde oluşturulur. Agent/admin bütün aktiviteleri, müşteri yalnızca sahibi olduğu ticket'ın public aktivitelerini görür; iç işlem nedenleri müşteriye döndürülmez. Seed geçmişi de ticket başına sorgu yapılmadan deterministik `createMany` partileriyle üretilir.
+
+## 2026-07-25 — Aktif Dashboard Kapsamı ve Destek Kuyrukları
+
+Dashboard metriklerinde aktif ticket tanımı `new`, `open` ve `pending` durumlarıyla sınırlandı. `resolved` ve `closed` kayıtlar durum, öncelik, SLA ihlali ve ajan iş yükü sayılarına dahil edilmez.
+
+**Karar:** Kuyruklar yeni sayfalar veya kalıcı veri modelleri yerine mevcut ticket listeleme endpoint'inin `queue` filtresi olarak uygulandı. `My Tickets` yalnızca agent'ın kendisine atanmış aktif kayıtları, `Unassigned & Open` atanmamış aktif kayıtları, `Escalated` ise SLA ihlalli aktif kayıtları getirir. Kuyrukların ortak ticket içerebilmesi gerçek destek iş akışını koruduğu için birbirini dışlayan kategoriler tasarlanmadı.
+
+## 2026-07-25 — SLA İhlal Türleri ve Olay Anında Hesaplama
+
+İlk yanıt ve çözüm SLA ihlalleri ayrı boolean alanlarda saklanır. Mevcut `slaBreached` alanı dashboard, ihlal listesi ve `Escalated` kuyruğuyla geriye uyumluluk için iki türün toplam sonucu olarak korunur.
+
+**Karar:** Dashboard isteğine bağlı ihlal hesabı tek başına yeterli görülmedi. İlk agent/admin genel yanıtında ilk yanıt ihlali, `resolved` geçişinde çözüm ihlali aynı transaction içinde hesaplanır. Periyodik tarama yalnızca henüz olay gerçekleşmemiş ticket'lar için güvenlik ağıdır. Müşteri yorumu ilk yanıt sayılmaz; her yorum `lastActivityAt` değerini güncellediği için otomatik kapanma gerçek hareketsizliğe göre çalışır.

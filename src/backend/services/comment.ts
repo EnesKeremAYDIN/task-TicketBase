@@ -1,7 +1,14 @@
 import prisma from '../lib/prisma';
 import { NotFoundError, ValidationError, ForbiddenError } from '../lib/errors';
 import { tenantFilter } from '../lib/tenant-context';
-import { calculateTenantSLADeadlineValues } from './sla';
+import {
+  calculateTenantSLADeadlineValues,
+  isFirstResponseSlaBreached,
+} from './sla';
+import {
+  recordTicketActivity,
+  type TicketActivitySource,
+} from './ticket-activity';
 
 const VALID_TYPES = ['public_reply', 'internal_note'];
 
@@ -12,6 +19,7 @@ export async function createComment(
   authorTenantId: string,
   type: string,
   body: string,
+  source: TicketActivitySource = 'web',
 ) {
   if (!VALID_TYPES.includes(type)) {
     throw new ValidationError('Geçersiz yorum türü');
@@ -51,12 +59,18 @@ export async function createComment(
   const reopenDeadlines = shouldReopenForCustomerReply && ticket.status === 'resolved'
     ? await calculateTenantSLADeadlineValues(authorTenantId, ticket.priority, now)
     : null;
+  const firstResponseBreached = isFirstAgentPublicReply
+    ? ticket.firstResponseSlaBreached
+      || isFirstResponseSlaBreached(now, ticket.firstResponseSlaDue)
+    : ticket.firstResponseSlaBreached;
 
   const comment = await prisma.$transaction(async (tx) => {
     const ticketUpdate: Record<string, unknown> = { lastActivityAt: now };
 
     if (isFirstAgentPublicReply) {
       ticketUpdate.firstResponseAt = now;
+      ticketUpdate.firstResponseSlaBreached = firstResponseBreached;
+      if (firstResponseBreached) ticketUpdate.slaBreached = true;
       if (ticket.status === 'new') ticketUpdate.status = 'open';
     }
 
@@ -66,7 +80,8 @@ export async function createComment(
       ticketUpdate.pendingReason = null;
       if (reopenDeadlines) {
         ticketUpdate.slaDueAt = reopenDeadlines.slaDueAt;
-        ticketUpdate.slaBreached = false;
+        ticketUpdate.resolutionSlaBreached = false;
+        ticketUpdate.slaBreached = ticket.firstResponseSlaBreached;
       }
     }
 
@@ -77,6 +92,26 @@ export async function createComment(
 
     if (updateResult.count === 0) {
       throw new ValidationError('Ticket durumu değişti, yorum tekrar gönderilmeli');
+    }
+
+    const newStatus = ticket.status === 'new' && isFirstAgentPublicReply
+      ? 'open'
+      : shouldReopenForCustomerReply ? 'open' : null;
+
+    if (newStatus) {
+      await recordTicketActivity(tx, {
+        tenantId: authorTenantId,
+        ticketId,
+        actorId: authorId,
+        type: 'status_changed',
+        field: 'status',
+        oldValue: ticket.status,
+        newValue: newStatus,
+        reason: shouldReopenForCustomerReply ? 'Müşteri yanıt verdi' : 'İlk agent yanıtı gönderildi',
+        source,
+        visibility: 'public',
+        createdAt: now,
+      });
     }
 
     return tx.comment.create({

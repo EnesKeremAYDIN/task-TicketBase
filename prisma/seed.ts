@@ -1,6 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { calculateSLADeadlineValues, type SLADeadlinePolicy } from '../src/backend/services/sla';
+import {
+  calculateSLADeadlineValues,
+  isFirstResponseSlaBreached,
+  isResolutionSlaBreached,
+  type SLADeadlinePolicy,
+} from '../src/backend/services/sla';
 
 const prisma = new PrismaClient();
 
@@ -74,6 +79,7 @@ const VERBS = [
 ];
 
 const RANDOM_SEED = 20260722;
+const SEED_REFERENCE_AT = new Date('2026-07-22T09:00:00.000Z');
 const TICKETS_PER_TENANT = 25000;
 const COMMENTS_PER_TENANT = 100000;
 let randomState = RANDOM_SEED;
@@ -110,13 +116,16 @@ async function validateSeed(): Promise<void> {
   );
   const expectedTicketCount = TENANTS.length * TICKETS_PER_TENANT;
   const expectedCommentCount = TENANTS.length * COMMENTS_PER_TENANT;
+  const expectedMinimumActivityCount = expectedTicketCount;
 
   const [
     userCount,
     ticketCount,
     commentCount,
+    activityCount,
     uncategorizedCount,
     missingSlaCount,
+    inconsistentSlaBreachCount,
     pendingWithoutReminderCount,
     reopenedTicketCount,
     categoryGroups,
@@ -124,12 +133,31 @@ async function validateSeed(): Promise<void> {
     prisma.user.count(),
     prisma.ticket.count(),
     prisma.comment.count(),
+    prisma.ticketActivity.count(),
     prisma.ticket.count({ where: { category: null } }),
     prisma.ticket.count({
       where: {
         OR: [
           { firstResponseSlaDue: null },
           { slaDueAt: null },
+        ],
+      },
+    }),
+    prisma.ticket.count({
+      where: {
+        OR: [
+          {
+            slaBreached: true,
+            firstResponseSlaBreached: false,
+            resolutionSlaBreached: false,
+          },
+          {
+            slaBreached: false,
+            OR: [
+              { firstResponseSlaBreached: true },
+              { resolutionSlaBreached: true },
+            ],
+          },
         ],
       },
     }),
@@ -145,8 +173,14 @@ async function validateSeed(): Promise<void> {
     userCount === expectedUserCount ? null : `Kullanıcı sayısı ${userCount}; beklenen ${expectedUserCount}`,
     ticketCount === expectedTicketCount ? null : `Ticket sayısı ${ticketCount}; beklenen ${expectedTicketCount}`,
     commentCount === expectedCommentCount ? null : `Yorum sayısı ${commentCount}; beklenen ${expectedCommentCount}`,
+    activityCount >= expectedMinimumActivityCount
+      ? null
+      : `Aktivite sayısı ${activityCount}; en az ${expectedMinimumActivityCount} bekleniyor`,
     uncategorizedCount === 0 ? null : `${uncategorizedCount} ticket kategorisiz`,
     missingSlaCount === 0 ? null : `${missingSlaCount} ticket'ın SLA tarihi eksik`,
+    inconsistentSlaBreachCount === 0
+      ? null
+      : `${inconsistentSlaBreachCount} ticket'ın SLA ihlal türü özet alanıyla uyumsuz`,
     pendingWithoutReminderCount === 0 ? null : `${pendingWithoutReminderCount} pending ticket'ın reminder tarihi eksik`,
     reopenedTicketCount > 0 ? null : 'Yeniden açılma geçmişi olan örnek ticket yok',
     missingCategories.length === 0 ? null : `Eksik kategoriler: ${missingCategories.join(', ')}`,
@@ -156,7 +190,7 @@ async function validateSeed(): Promise<void> {
     throw new Error(`Seed doğrulaması başarısız:\n- ${errors.join('\n- ')}`);
   }
 
-  console.log(`  Doğrulandı: ${userCount} kullanıcı, ${ticketCount} ticket, ${commentCount} yorum, ${CATEGORIES.length} kategori.`);
+  console.log(`  Doğrulandı: ${userCount} kullanıcı, ${ticketCount} ticket, ${commentCount} yorum, ${activityCount} aktivite, ${CATEGORIES.length} kategori.`);
 }
 
 async function main() {
@@ -173,7 +207,7 @@ async function main() {
       data: { slug: tenantData.slug, name: tenantData.name },
     });
 
-    await prisma.user.create({
+    const admin = await prisma.user.create({
       data: {
         tenantId: tenant.id,
         email: `admin@${tenantData.slug}.com`,
@@ -184,6 +218,7 @@ async function main() {
     });
 
     const agents: string[] = [];
+    const agentNames = new Map<string, string>();
     for (let i = 1; i <= tenantData.agentCount; i++) {
       const user = await prisma.user.create({
         data: {
@@ -195,6 +230,7 @@ async function main() {
         },
       });
       agents.push(user.id);
+      agentNames.set(user.id, user.name);
     }
 
     const customers: string[] = [];
@@ -256,6 +292,9 @@ async function main() {
         const createdAt = randomDate(new Date('2025-01-01'), new Date('2026-06-01'));
         const title = generateTitle(category);
         const deadlines = calculateSLADeadlineValues(createdAt, SLA_CONFIG[priority], holidayDates);
+        const firstResponseAt = status === 'new'
+          ? null
+          : new Date(createdAt.getTime() + (1 + (number % 12)) * 60 * 60 * 1000);
         const isReopened = status === 'open' && number % 50 === 0;
         const resolvedAt = ['resolved', 'closed'].includes(status) || isReopened
           ? new Date(createdAt.getTime() + 2 * 24 * 60 * 60 * 1000)
@@ -273,6 +312,14 @@ async function main() {
           ? new Date(Date.UTC(2026, 11, 1 + (number % 28), 9, 0, 0))
           : null;
         const lastActivityAt = lastReopenedAt || closedAt || resolvedAt || createdAt;
+        const firstResponseSlaBreached = isFirstResponseSlaBreached(
+          firstResponseAt || SEED_REFERENCE_AT,
+          deadlines.firstResponseSlaDue,
+        );
+        const resolutionSlaBreached = isResolutionSlaBreached(
+          resolvedAt || SEED_REFERENCE_AT,
+          deadlines.slaDueAt,
+        );
 
         tickets.push({
           tenantId: tenant.id,
@@ -285,6 +332,7 @@ async function main() {
           category,
           customerId,
           assignedToId,
+          firstResponseAt,
           resolvedAt,
           firstClosedAt,
           closedAt: closedAt || firstClosedAt,
@@ -295,6 +343,9 @@ async function main() {
           lastActivityAt,
           firstResponseSlaDue: deadlines.firstResponseSlaDue,
           slaDueAt: deadlines.slaDueAt,
+          firstResponseSlaBreached,
+          resolutionSlaBreached,
+          slaBreached: firstResponseSlaBreached || resolutionSlaBreached,
           createdAt,
           updatedAt: createdAt,
         });
@@ -305,9 +356,165 @@ async function main() {
 
     const allTickets = await prisma.ticket.findMany({
       where: { tenantId: tenant.id },
-      select: { id: true, customerId: true, assignedToId: true, status: true, createdAt: true },
+      select: {
+        id: true,
+        customerId: true,
+        assignedToId: true,
+        status: true,
+        createdAt: true,
+        firstResponseAt: true,
+        resolvedAt: true,
+        firstClosedAt: true,
+        lastReopenedAt: true,
+        pendingReason: true,
+      },
       orderBy: { number: 'asc' },
     });
+
+    console.log(`  ${ticketCount} ticket için aktivite geçmişi oluşturuluyor...`);
+
+    for (let batch = 0; batch < allTickets.length; batch += batchSize) {
+      const ticketBatch = allTickets.slice(batch, batch + batchSize);
+      const activities = [];
+
+      for (const ticket of ticketBatch) {
+        const agentId = ticket.assignedToId || admin.id;
+        const openedAt = ticket.firstResponseAt
+          || new Date(ticket.createdAt.getTime() + 60 * 60 * 1000);
+        const nextStepAt = new Date(ticket.createdAt.getTime() + 2 * 60 * 60 * 1000);
+
+        activities.push({
+          tenantId: tenant.id,
+          ticketId: ticket.id,
+          actorId: ticket.customerId,
+          type: 'ticket_created',
+          field: 'status',
+          oldValue: null,
+          newValue: 'new',
+          oldLabel: null,
+          newLabel: null,
+          reason: null,
+          source: 'seed',
+          visibility: 'public',
+          createdAt: ticket.createdAt,
+        });
+
+        if (ticket.assignedToId) {
+          activities.push({
+            tenantId: tenant.id,
+            ticketId: ticket.id,
+            actorId: admin.id,
+            type: 'assignee_changed',
+            field: 'assignedToId',
+            oldValue: null,
+            newValue: ticket.assignedToId,
+            oldLabel: 'Atanmamış',
+            newLabel: agentNames.get(ticket.assignedToId) || 'Agent',
+            reason: null,
+            source: 'seed',
+            visibility: 'internal',
+            createdAt: new Date(ticket.createdAt.getTime() + 30 * 60 * 1000),
+          });
+        }
+
+        if (ticket.status !== 'new') {
+          activities.push({
+            tenantId: tenant.id,
+            ticketId: ticket.id,
+            actorId: agentId,
+            type: 'status_changed',
+            field: 'status',
+            oldValue: 'new',
+            newValue: 'open',
+            oldLabel: null,
+            newLabel: null,
+            reason: 'İlk agent yanıtı gönderildi',
+            source: 'seed',
+            visibility: 'public',
+            createdAt: openedAt,
+          });
+        }
+
+        if (ticket.status === 'pending') {
+          activities.push({
+            tenantId: tenant.id,
+            ticketId: ticket.id,
+            actorId: agentId,
+            type: 'status_changed',
+            field: 'status',
+            oldValue: 'open',
+            newValue: 'pending',
+            oldLabel: null,
+            newLabel: null,
+            reason: ticket.pendingReason,
+            source: 'seed',
+            visibility: 'public',
+            createdAt: nextStepAt,
+          });
+        }
+
+        if (['resolved', 'closed'].includes(ticket.status) || ticket.lastReopenedAt) {
+          activities.push({
+            tenantId: tenant.id,
+            ticketId: ticket.id,
+            actorId: agentId,
+            type: 'status_changed',
+            field: 'status',
+            oldValue: 'open',
+            newValue: 'resolved',
+            oldLabel: null,
+            newLabel: null,
+            reason: null,
+            source: 'seed',
+            visibility: 'public',
+            createdAt: ticket.resolvedAt || nextStepAt,
+          });
+        }
+
+        if (ticket.status === 'closed' || ticket.lastReopenedAt) {
+          const closedAt = ticket.firstClosedAt || new Date(ticket.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+          activities.push({
+            tenantId: tenant.id,
+            ticketId: ticket.id,
+            actorId: admin.id,
+            type: 'status_changed',
+            field: 'status',
+            oldValue: 'resolved',
+            newValue: 'closed',
+            oldLabel: null,
+            newLabel: null,
+            reason: null,
+            source: 'seed',
+            visibility: 'public',
+            createdAt: closedAt,
+          });
+        }
+
+        if (ticket.lastReopenedAt) {
+          activities.push({
+            tenantId: tenant.id,
+            ticketId: ticket.id,
+            actorId: admin.id,
+            type: 'status_changed',
+            field: 'status',
+            oldValue: 'closed',
+            newValue: 'open',
+            oldLabel: null,
+            newLabel: null,
+            reason: 'Ek inceleme gerekti',
+            source: 'seed',
+            visibility: 'public',
+            createdAt: ticket.lastReopenedAt,
+          });
+        }
+      }
+
+      for (let activityBatch = 0; activityBatch < activities.length; activityBatch += 500) {
+        await prisma.ticketActivity.createMany({
+          data: activities.slice(activityBatch, activityBatch + 500),
+        });
+      }
+    }
 
     const commentCount = COMMENTS_PER_TENANT;
     console.log(`  ${commentCount} yorum oluşturuluyor...`);

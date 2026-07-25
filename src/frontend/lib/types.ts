@@ -31,6 +31,35 @@ export interface BulkTicketResult {
   failed: Array<BulkTicketResultItem & { reason: string }>;
 }
 
+export type TicketActivityType =
+  | 'ticket_created'
+  | 'status_changed'
+  | 'priority_changed'
+  | 'assignee_changed'
+  | 'follow_up_created';
+
+export interface TicketActivity {
+  id: string;
+  type: TicketActivityType;
+  field: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  oldLabel: string | null;
+  newLabel: string | null;
+  reason: string | null;
+  source: 'web' | 'email' | 'bulk' | 'system' | 'seed';
+  visibility: 'public' | 'internal';
+  actor: { id: string; name: string; role: string } | null;
+  createdAt: string;
+}
+
+export interface TicketActivityResponse {
+  activities: TicketActivity[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface Ticket {
   id: string;
   displayId: string;
@@ -54,6 +83,8 @@ export interface Ticket {
   lastActivityAt: string;
   followUpOf: { id: string; displayId: string; title: string } | null;
   allowedActions: TicketAction[];
+  firstResponseSlaBreached: boolean;
+  resolutionSlaBreached: boolean;
   slaBreached: boolean;
   slaDueAt: string | null;
   firstResponseSlaDue: string | null;
@@ -70,9 +101,21 @@ export interface Comment {
 export interface DashboardStats {
   statusBreakdown: Record<string, number>;
   priorityBreakdown: Record<string, number>;
+  activeTotal: number;
   slaBreached: number;
   agentWorkload: Record<string, number>;
+  queueCounts: {
+    myTickets: number;
+    unassignedOpen: number;
+    escalated: number;
+  };
+  slaBreachBreakdown: {
+    firstResponse: number;
+    resolution: number;
+  };
 }
+
+export type TicketQueue = 'my' | 'unassigned' | 'escalated';
 
 export interface Agent {
   id: string;

@@ -36,6 +36,7 @@ Spec'te belirtilen tüm entity'ler `prisma/schema.prisma`'da tanımlandı:
 | User | admin/agent/customer, tenant'a bağlı | ✅ `email` @unique (global), `role` |
 | Ticket | displayId, status, priority, customer, agent | ✅ `@@unique([tenantId, number])`, index'ler |
 | Comment | public_reply / internal_note | ✅ `type` ile ayrım, tenant scope'lu |
+| TicketActivity | actor, source, field, old/new value, reason, visibility | ✅ Transaction içi immutable audit kaydı, tenant scope'lu |
 | SLAPolicy | Öncelik bazlı SLA hedefleri | ✅ `@@unique([tenantId, priority])` |
 | InboundMessage | Webhook mesaj kaydı, dedup | ✅ `messageId` @unique |
 | Holiday | Tatil günleri | ✅ `@@unique([tenantId, date])` |
@@ -66,8 +67,11 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Müşteri çözüm onayı | `resolved → closed` veya açıklamayla `resolved → open` |
 | Pending reminder | Tarih ve neden zorunlu; süresi gelince veya müşteri yanıtlayınca `open` |
 | Kapalı follow-up | Web/e-posta mesajı eski kayda bağlı yeni ticket oluşturur |
-| Toplu ticket işlemleri | En fazla 100 seçili kayıt; durum, öncelik ve ajan işlemleri; kısmi başarı sonucu ve iç not geçmişi |
+| Toplu ticket işlemleri | En fazla 100 seçili kayıt; durum, öncelik ve ajan işlemleri; kısmi başarı sonucu ve structured audit geçmişi |
 | Bulk rol kuralları | Agent kendine atar; admin atar/atamayı kaldırır; state machine ve tenant kontrolleri korunur |
+| Activity/audit trail | Durum, öncelik ve atama değişiklikleri actor, kaynak, eski/yeni değer ve zamanla kaydedilir |
+| Sistem aktiviteleri | Pending reminder ve otomatik kapanma `actor=null`, `source=system` ile kaydedilir |
+| Activity görünürlüğü | Agent/admin tüm olayları; müşteri yalnızca kendi ticket'ındaki public olayları, neden bilgisi olmadan görür |
 | Geçersiz geçiş reddi | `validateTransition()` → rol ve durum kontrolüyle `ValidationError` |
 | Ardışık benzersiz numara | `TicketCounter` tablosu, `$transaction` ile atomic increment |
 | Race condition koruması | `race-test` → 20/20 benzersiz |
@@ -111,7 +115,10 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Mesai saatleri 09:00-18:00 | `business-hours.ts` → UTC+3, WORK_START:6, WORK_END:15 |
 | Hafta sonu + tatil | `isWeekend()` + `isHoliday()` (seed'de 7 tatil/tenant) |
 | SLA hedef tablosu | `SLAPolicy` seed: urgent(1s/8s), high(4s/24s), normal(8s/3gün), low(24s/5gün) |
-| breached işaretleme | `markBreachedTickets()` → periyodik + dashboard'da |
+| İlk yanıt ihlali | İlk agent/admin `public_reply` transaction'ında deadline karşılaştırması; müşteri yorumu ilk yanıt sayılmaz |
+| Çözüm ihlali | `resolved` geçişi transaction'ında çözüm deadline karşılaştırması |
+| İhlal türleri | `firstResponseSlaBreached` ve `resolutionSlaBreached`; `slaBreached` toplam/geriye uyumlu alan |
+| Periyodik güvenlik ağı | `markBreachedTickets()` henüz yanıtlanmamış veya çözülmemiş aktif kayıtları tür bazında işaretler |
 | Spec örneği doğrulandı | "Cuma 17:00 → Pazartesi 12:00" test edildi (sla.test.ts) |
 
 ### FR-07 — Listeler ve Dashboard
@@ -122,8 +129,9 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Arama | `title` + `description` `contains` |
 | Sayfalama | `skip/take`, parametrik `page` + `limit` |
 | Son yorum önizlemesi | Ayrı `findMany` + `distinct['ticketId']` ile |
-| Dashboard (durum/öncelik/SLA/agent iş yükü) | `getDashboardStats()` → 4 paralel aggregate |
-| Akıcı çalışma (100k) | P95: list 5ms, dashboard 78ms |
+| Dashboard (durum/öncelik/SLA/agent iş yükü) | `getDashboardStats()` → yalnızca `new`, `open`, `pending` kapsamlı paralel aggregate sorguları |
+| Destek kuyrukları | `My Tickets` (agent), `Unassigned & Open` ve `Escalated` (agent/admin); mevcut filtre ve sayfalama ile birleşir |
+| Akıcı çalışma (100k) | P95: list 6ms, dashboard 65ms |
 
 ### FR-08 — İşletim Kuralları Ekranı
 
@@ -150,8 +158,8 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 
 | İstek | Limit | Gerçek | Durum |
 |-------|-------|--------|-------|
-| Ticket listesi p95 | <300ms | **5ms** | ✅ |
-| Dashboard p95 | <500ms | **78ms** | ✅ |
+| Ticket listesi p95 | <300ms | **6ms** | ✅ |
+| Dashboard p95 | <500ms | **65ms** | ✅ |
 | `npm run perf` script'i | — | Mevcut | ✅ |
 
 ### NFR-02 — Eşzamanlılık
@@ -177,7 +185,7 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 |-------|-------|
 | TypeScript strict: true | ✅ `tsconfig.json`'da tanımlı |
 | any kullanımı gerekçelendirilmeli | ✅ Minimal, tip dönüşümleri `as` ile |
-| Birim testleri | ✅ **83 test** (bulk işlemler, yaşam döngüsü, state machine, numbering, SLA, kategori, webhook, visibility) |
+| Birim testleri | ✅ **105 test** (SLA ihlal türleri, yanıtsız çözüm, dashboard/kuyruklar, activity/audit, bulk işlemler, yaşam döngüsü, state machine, numbering, kategori, webhook, visibility) |
 | Lint temiz | ✅ `npm run lint` 0 hata |
 
 ### NFR-05 — Zaman Yönetimi
@@ -218,10 +226,10 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Test | Sonuç |
 |------|-------|
 | `npm run lint` | ✅ **0 hata** |
-| `npm test` | ✅ **83/83 geçti** (7 dosya) |
+| `npm test` | ✅ **105/105 geçti** (9 dosya) |
 | `npm run race-test` | ✅ 20/20 benzersiz, 1/10 claim |
 | `npm run isolation-test` | ✅ 9/9 sıfır sızıntı |
-| `npm run perf` | ✅ Liste P95: **5ms**, Dashboard P95: **78ms** |
+| `npm run perf` | ✅ Liste P95: **6ms**, Dashboard P95: **65ms** |
 
 ---
 

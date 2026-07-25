@@ -14,10 +14,11 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users      User[]
-  tickets    Ticket[]
-  slaPolicies SLAPolicy[]
-  holidays   Holiday[]
+  users            User[]
+  tickets          Ticket[]
+  ticketActivities TicketActivity[]
+  slaPolicies      SLAPolicy[]
+  holidays         Holiday[]
 }
 
 model User {
@@ -34,6 +35,7 @@ model User {
   tickets         Ticket[] @relation("CustomerTickets")
   assignedTickets Ticket[] @relation("AssignedTickets")
   comments        Comment[]
+  ticketActivities TicketActivity[] @relation("TicketActivityActor")
 
   @@index([tenantId])
 }
@@ -67,16 +69,23 @@ model Ticket {
   followUpOf          Ticket?    @relation("TicketFollowUps", fields: [followUpOfId], references: [id])
   followUps           Ticket[]   @relation("TicketFollowUps")
   slaDueAt            DateTime?
-  slaBreached         Boolean   @default(false)
+  firstResponseSlaBreached Boolean @default(false)
+  resolutionSlaBreached    Boolean @default(false)
+  slaBreached              Boolean @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  comments Comment[]
+  comments   Comment[]
+  activities TicketActivity[]
 
   @@unique([tenantId, number])
   @@index([tenantId, status])
   @@index([tenantId, priority])
   @@index([tenantId, assignedToId])
+  @@index([tenantId, assignedToId, status])
+  @@index([tenantId, slaBreached, status])
+  @@index([tenantId, firstResponseSlaBreached, status])
+  @@index([tenantId, resolutionSlaBreached, status])
   @@index([tenantId, createdAt])
   @@index([tenantId, status, pendingUntil])
   @@index([followUpOfId])
@@ -94,6 +103,29 @@ model Comment {
   updatedAt DateTime @updatedAt
 
   @@index([ticketId, createdAt])
+  @@index([ticketId, type])
+}
+
+model TicketActivity {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User?    @relation("TicketActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+  type       String
+  field      String?
+  oldValue   String?
+  newValue   String?
+  oldLabel   String?
+  newLabel   String?
+  reason     String?
+  source     String
+  visibility String   @default("internal")
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, ticketId, createdAt])
   @@index([ticketId, type])
 }
 

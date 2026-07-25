@@ -37,10 +37,11 @@
 | **→ Durumlar** | Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontrollü yeniden açılma desteklenir |
 | **→ Öncelikler** | `low`, `normal`, `high`, `urgent` |
 | **Comment** | İki tür: `public_reply` (müşteri görür) ve `internal_note` (sadece agent/admin) |
+| **TicketActivity** | Durum, öncelik, atama, takip ve oluşturma olaylarının actor, kaynak, eski/yeni değer ve zaman bilgili audit kaydı |
 | **SLA Policy** | Önceliğe göre ilk yanıt ve çözüm süresi hedefleri (tenant başına, seed'de hazır) |
 | **InboundMessage** | Mock e-posta kanalından gelen ham mesaj kaydı |
 
-**Seed verisi:** 4 tenant, 38 sabit kullanıcı, 100.000 ticket, 400.000 yorum
+**Seed verisi:** 4 tenant, 38 sabit kullanıcı, 100.000 ticket, 400.000 yorum ve 341.537 deterministik ticket aktivitesi
 
 ---
 
@@ -61,7 +62,9 @@
 - Agent/admin, mevcut sayfadaki en fazla 100 ticket üzerinde durum ve öncelik işlemi yapabilir
 - Agent yalnızca atanmamış ticket'ları topluca kendine alabilir; admin toplu atama veya atama kaldırma yapabilir
 - Toplu işlemler state machine, tenant ve SLA kurallarını tekil işlemlerle aynı şekilde uygular; uygun olmayan kayıtlar nedenleriyle raporlanır
-- Başarılı toplu değişiklikler ticket geçmişine iç not olarak kaydedilir
+- Başarılı toplu değişiklikler structured `TicketActivity` kayıtları olarak saklanır
+- Durum, öncelik ve atama değişiklikleri eski/yeni değer, actor, kaynak ve zaman bilgisiyle audit edilir
+- Otomatik pending açılması ve otomatik kapanma işlemleri `system` kaynağıyla kaydedilir
 - Açılış anında tenant içinde ardışık benzersiz numara (`ACME-1`, `ACME-2`...)
 - Atlama kabul edilir, **çakışma (duplicate) kabul edilmez** — eşzamanlı açılışta dahi (NFR-02)
 
@@ -75,6 +78,7 @@
 - Agent: `public_reply` veya `internal_note` yazabilir
 - Müşteri: yalnızca `public_reply` yazabilir ve **yalnızca** `public_reply` görebilir
 - İlk agent/admin `public_reply`, SLA "ilk yanıt" saatini durdurur; müşteri mesajı ilk yanıt sayılmaz
+- Ticket detayında sayfalı aktivite zaman çizelgesi bulunur; müşteri yalnızca public olayları ve neden bilgisi gizlenmiş kayıtları görür
 
 ### FR-05 — E-posta Kanalı (Mock)
 - `mock-mail-channel` servisi webhook gönderir (API sözleşmesi kendi README'sinde)
@@ -90,7 +94,9 @@
 - SLA süreleri **mesai saatleri** üzerinden işler: hafta içi 09:00-18:00 (`Europe/Istanbul`)
 - Hafta sonu ve resmi tatiller (seed'de tatil tablosu) sayılmaz
 - Örn: Cuma 17:00'de açılan `high` ticket'ın 4 saatlik ilk yanıt hedefi Pazartesi 12:00'dir
-- Süre geçen ticket'lar `sla_breached` işaretlenir ve dashboard'da listelenir
+- İlk agent/admin yanıtı sırasında ilk yanıt deadline'ı, `resolved` geçişinde çözüm deadline'ı transaction içinde kontrol edilir
+- İlk yanıt ve çözüm ihlalleri ayrı alanlarda saklanır; toplam ihlal bilgisi dashboard ve `Escalated` kuyruğuyla uyumludur
+- Periyodik tarama henüz yanıtlanmamış veya çözülmemiş ticket'lar için güvenlik ağı olarak çalışır
 - Önceki geliştiriciden kalan mesai-saati hesaplayıcısı var; kullanmak/değiştirmek sana kalmış
 
 **SLA Hedefleri (seed varsayılanı, tüm tenant'lar):**
@@ -104,7 +110,8 @@
 
 ### FR-07 — Listeler ve Dashboard
 - **Agent görünümü:** tenant ticket listesi; durum/öncelik/atanan/kategori filtreleri, arama, sayfalama, son yorum önizlemesi
-- **Dashboard:** açık ticket sayıları (durum + öncelik kırılımı), SLA ihlalleri, agent başına açık iş yükü
+- **Dashboard:** yalnızca `new`, `open`, `pending` ticket sayıları (durum + öncelik kırılımı), aktif SLA ihlalleri ve agent başına aktif iş yükü
+- **Destek kuyrukları:** agent için `My Tickets`; agent/admin için `Unassigned & Open` ve `Escalated`. Kuyruk seçimi mevcut filtreler, arama ve sayfalama ile birlikte çalışır
 - 100k seed verisiyle **akıcı** çalışmalı (NFR-01)
 
 ### FR-08 — İşletim Kuralları Ekranı

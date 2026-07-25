@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getAuthenticatedUser, requireRole } from '../lib/tenant-context';
-import { ValidationError } from '../lib/errors';
+import { ForbiddenError, ValidationError } from '../lib/errors';
 import {
   createTicket,
   listTickets,
@@ -14,6 +14,8 @@ import {
   assignTicket,
 } from '../services/ticket';
 import { bulkUpdateTickets } from '../services/bulk-ticket';
+import { getTicketActivities } from '../services/ticket-activity';
+import { markBreachedTickets } from '../services/sla';
 
 const createTicketSchema = z.object({
   title: z.string().min(1, 'Başlık zorunludur').max(500),
@@ -40,6 +42,8 @@ const followUpSchema = z.object({
 const assignSchema = z.object({
   agentId: z.string().min(1, 'Ajan ID zorunludur'),
 });
+
+const ticketQueueSchema = z.enum(['my', 'unassigned', 'escalated']);
 
 const bulkTicketSchema = z.object({
   ticketIds: z.array(z.string().min(1))
@@ -95,13 +99,35 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
 
     const page = Math.max(1, parseInt(query.page || '1'));
     const limit = Math.min(100, Math.max(1, parseInt(query.limit || '20')));
+    const requestedQueue = query.queue
+      || (query.assignedToId === 'unassigned' ? 'unassigned' : undefined);
+    const parsedQueue = requestedQueue
+      ? ticketQueueSchema.safeParse(requestedQueue)
+      : undefined;
+
+    if (parsedQueue && !parsedQueue.success) {
+      throw new ValidationError('Geçersiz ticket kuyruğu');
+    }
+
+    const queue = parsedQueue?.success ? parsedQueue.data : undefined;
+    if (queue && user.role === 'customer') {
+      throw new ForbiddenError('Ticket kuyrukları yalnızca destek ekibi içindir');
+    }
+    if (queue === 'my' && user.role !== 'agent') {
+      throw new ForbiddenError('My Tickets kuyruğu yalnızca ajan kullanıcıları içindir');
+    }
+    if (queue === 'escalated') {
+      await markBreachedTickets(user.tenantId);
+    }
 
     const result = await listTickets({
       tenantId: user.tenantId,
       customerId: user.role === 'customer' ? user.id : undefined,
+      queue,
+      currentUserId: user.id,
       status: query.status,
       priority: query.priority,
-      assignedToId: query.assignedToId,
+      assignedToId: query.assignedToId === 'unassigned' ? undefined : query.assignedToId,
       category: query.category,
       search: query.search,
       page,
@@ -117,6 +143,20 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
 
     const ticket = await getTicketById(id, user.tenantId, user.id, user.role);
     return ticket;
+  });
+
+  app.get('/api/tickets/:id/activities', async (request, _reply) => {
+    const user = requireRole(request, ['customer', 'agent', 'admin']);
+    const { id } = request.params as { id: string };
+    const query = request.query as Record<string, string>;
+    const requestedPage = Number.parseInt(query.page || '1', 10);
+    const requestedLimit = Number.parseInt(query.limit || '50', 10);
+    const page = Number.isFinite(requestedPage) ? Math.max(1, requestedPage) : 1;
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(100, Math.max(1, requestedLimit))
+      : 50;
+
+    return getTicketActivities(id, user.tenantId, user.id, user.role, page, limit);
   });
 
   app.post('/api/tickets/bulk', async (request, _reply) => {
@@ -218,7 +258,7 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
       throw new ValidationError(parsed.error.errors[0].message);
     }
 
-    const ticket = await assignTicket(id, user.tenantId, parsed.data.agentId);
+    const ticket = await assignTicket(id, user.tenantId, parsed.data.agentId, user.id);
     return ticket;
   });
 }

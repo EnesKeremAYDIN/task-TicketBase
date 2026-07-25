@@ -246,6 +246,29 @@ describe('Ticket Yaşam Döngüsü', () => {
     }
   });
 
+  it('resolved ticketta yeni yorum varsa otomatik kapanma ertelenmeli', async () => {
+    const ticket = await createTicket(`Hareketsizlik yorumu ${crypto.randomUUID()}`);
+    await changeStatus(ticket.id, agentToken, 'open');
+    await changeStatus(ticket.id, agentToken, 'resolved');
+    await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { lastActivityAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000) },
+    });
+
+    const commentResponse = await app.inject({
+      method: 'POST',
+      url: `/api/tickets/${ticket.id}/comments`,
+      headers: { authorization: `Bearer ${agentToken}` },
+      payload: { type: 'internal_note', body: 'Çözüm sonrası kontrol devam ediyor' },
+    });
+    expect(commentResponse.statusCode).toBe(200);
+
+    await autoCloseResolvedTickets(tenantId);
+    const updated = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
+    expect(updated.status).toBe('resolved');
+    expect(updated.lastActivityAt.getTime()).toBeGreaterThan(Date.now() - 60 * 1000);
+  });
+
   it('kapalı ticket için web follow-up yeni ve bağlantılı ticket oluşturmalı', async () => {
     const ticket = await createTicket(`Web follow-up ${crypto.randomUUID()}`);
     await resolveTicket(ticket.id);

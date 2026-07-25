@@ -1,8 +1,13 @@
 import prisma from '../lib/prisma';
 import { AppError, ForbiddenError, ValidationError } from '../lib/errors';
 import type { TicketRole, TicketStatus } from '../lib/state-machine';
-import { calculateSLADeadlineValues } from './sla';
+import {
+  calculateSLADeadlineValues,
+  isFirstResponseSlaBreached,
+  isResolutionSlaBreached,
+} from './sla';
 import { updateTicketStatus } from './ticket';
+import { recordTicketActivity } from './ticket-activity';
 
 type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 
@@ -55,6 +60,17 @@ export async function bulkUpdateTickets(
     throw new ValidationError('Geçersiz ajan');
   }
 
+  const currentAssigneeIds = operation.type === 'assign' && actorRole === 'admin'
+    ? [...new Set(tickets.map((ticket) => ticket.assignedToId).filter((id): id is string => Boolean(id)))]
+    : [];
+  const currentAssignees = currentAssigneeIds.length > 0
+    ? await prisma.user.findMany({
+      where: { id: { in: currentAssigneeIds }, tenantId },
+      select: { id: true, name: true },
+    })
+    : [];
+  const currentAssigneeMap = new Map(currentAssignees.map((agent) => [agent.id, agent.name]));
+
   for (const ticketId of ticketIds) {
     const ticket = ticketMap.get(ticketId);
     if (!ticket) {
@@ -68,19 +84,20 @@ export async function bulkUpdateTickets(
           pendingUntil: operation.pendingUntil,
           pendingReason: operation.reason,
           reason: operation.reason,
-          auditNote: buildStatusAuditNote(operation.status, operation.reason),
+          source: 'bulk',
         });
       } else if (operation.type === 'priority') {
         await updatePriority(ticket, operation.priority, priorityContext!, actorId);
       } else if (actorRole === 'agent') {
-        await claimWithAudit(ticket.id, tenantId, actorId);
+        await claimWithActivity(ticket.id, tenantId, actorId, targetAgent?.name || 'Agent');
       } else {
         await updateAssignee(
-          ticket.id,
+          ticket,
           tenantId,
           operation.agentId,
           actorId,
           targetAgent?.name || null,
+          ticket.assignedToId ? currentAssigneeMap.get(ticket.assignedToId) || null : null,
         );
       }
 
@@ -132,20 +149,29 @@ async function updatePriority(
     id: string;
     tenantId: string;
     priority: string;
+    status: string;
     createdAt: Date;
     firstResponseAt: Date | null;
     resolvedAt: Date | null;
+    firstResponseSlaBreached: boolean;
+    resolutionSlaBreached: boolean;
   },
   priority: TicketPriority,
   context: Awaited<ReturnType<typeof getPriorityContext>>,
   actorId: string,
 ) {
+  if (ticket.priority === priority) return;
+
   const now = new Date();
   const deadlines = calculateSLADeadlineValues(ticket.createdAt, context.policy, context.holidayDates);
   const firstResponseReference = ticket.firstResponseAt || now;
-  const resolutionReference = ticket.resolvedAt || now;
-  const slaBreached = firstResponseReference > deadlines.firstResponseSlaDue
-    || resolutionReference > deadlines.slaDueAt;
+  const resolutionReference = ['resolved', 'closed'].includes(ticket.status)
+    ? ticket.resolvedAt || now
+    : now;
+  const firstResponseSlaBreached = ticket.firstResponseSlaBreached
+    || isFirstResponseSlaBreached(firstResponseReference, deadlines.firstResponseSlaDue);
+  const resolutionSlaBreached = ticket.resolutionSlaBreached
+    || isResolutionSlaBreached(resolutionReference, deadlines.slaDueAt);
 
   await prisma.$transaction(async (tx) => {
     const updateResult = await tx.ticket.updateMany({
@@ -154,7 +180,9 @@ async function updatePriority(
         priority,
         firstResponseSlaDue: deadlines.firstResponseSlaDue,
         slaDueAt: deadlines.slaDueAt,
-        slaBreached,
+        firstResponseSlaBreached,
+        resolutionSlaBreached,
+        slaBreached: firstResponseSlaBreached || resolutionSlaBreached,
         lastActivityAt: now,
       },
     });
@@ -163,19 +191,29 @@ async function updatePriority(
       throw new ValidationError('Ticket önceliği değişti, işlem tekrar denenmeli');
     }
 
-    await tx.comment.create({
-      data: {
-        ticketId: ticket.id,
-        authorId: actorId,
-        type: 'internal_note',
-        body: `Toplu işlem: Öncelik "${priorityLabel(priority)}" olarak değiştirildi.`,
-      },
+    await recordTicketActivity(tx, {
+      tenantId: ticket.tenantId,
+      ticketId: ticket.id,
+      actorId,
+      type: 'priority_changed',
+      field: 'priority',
+      oldValue: ticket.priority,
+      newValue: priority,
+      source: 'bulk',
+      visibility: 'internal',
+      createdAt: now,
     });
   });
 }
 
-async function claimWithAudit(ticketId: string, tenantId: string, actorId: string) {
+async function claimWithActivity(
+  ticketId: string,
+  tenantId: string,
+  actorId: string,
+  actorName: string,
+) {
   await prisma.$transaction(async (tx) => {
+    const now = new Date();
     const result = await tx.ticket.updateMany({
       where: {
         id: ticketId,
@@ -183,74 +221,64 @@ async function claimWithAudit(ticketId: string, tenantId: string, actorId: strin
         assignedToId: null,
         status: { in: ['new', 'open', 'pending'] },
       },
-      data: { assignedToId: actorId, lastActivityAt: new Date() },
+      data: { assignedToId: actorId, lastActivityAt: now },
     });
 
     if (result.count === 0) {
       throw new ValidationError('Bu ticket atanmış veya üstlenmeye uygun değil');
     }
 
-    await tx.comment.create({
-      data: {
-        ticketId,
-        authorId: actorId,
-        type: 'internal_note',
-        body: 'Toplu işlem: Ticket agent tarafından üstlenildi.',
-      },
+    await recordTicketActivity(tx, {
+      tenantId,
+      ticketId,
+      actorId,
+      type: 'assignee_changed',
+      field: 'assignedToId',
+      oldValue: null,
+      newValue: actorId,
+      oldLabel: 'Atanmamış',
+      newLabel: actorName,
+      source: 'bulk',
+      visibility: 'internal',
+      createdAt: now,
     });
   });
 }
 
 async function updateAssignee(
-  ticketId: string,
+  ticket: { id: string; assignedToId: string | null },
   tenantId: string,
   agentId: string | null,
   actorId: string,
   agentName: string | null,
+  oldAgentName: string | null,
 ) {
+  if (ticket.assignedToId === agentId) return;
+
   await prisma.$transaction(async (tx) => {
+    const now = new Date();
     const result = await tx.ticket.updateMany({
-      where: { id: ticketId, tenantId },
-      data: { assignedToId: agentId, lastActivityAt: new Date() },
+      where: { id: ticket.id, tenantId, assignedToId: ticket.assignedToId },
+      data: { assignedToId: agentId, lastActivityAt: now },
     });
 
     if (result.count === 0) {
       throw new ValidationError('Ticket ataması değiştirilemedi');
     }
 
-    await tx.comment.create({
-      data: {
-        ticketId,
-        authorId: actorId,
-        type: 'internal_note',
-        body: agentId
-          ? `Toplu işlem: Ticket "${agentName}" ajanına atandı.`
-          : 'Toplu işlem: Ticket ataması kaldırıldı.',
-      },
+    await recordTicketActivity(tx, {
+      tenantId,
+      ticketId: ticket.id,
+      actorId,
+      type: 'assignee_changed',
+      field: 'assignedToId',
+      oldValue: ticket.assignedToId,
+      newValue: agentId,
+      oldLabel: oldAgentName || 'Atanmamış',
+      newLabel: agentName || 'Atanmamış',
+      source: 'bulk',
+      visibility: 'internal',
+      createdAt: now,
     });
   });
-}
-
-function buildStatusAuditNote(status: TicketStatus, reason?: string) {
-  const reasonText = reason?.trim() ? ` Neden: ${reason.trim()}` : '';
-  return `Toplu işlem: Durum "${statusLabel(status)}" olarak değiştirildi.${reasonText}`;
-}
-
-function statusLabel(status: TicketStatus) {
-  return {
-    new: 'Yeni',
-    open: 'Açık',
-    pending: 'Beklemede',
-    resolved: 'Çözüldü',
-    closed: 'Kapalı',
-  }[status];
-}
-
-function priorityLabel(priority: TicketPriority) {
-  return {
-    low: 'Düşük',
-    normal: 'Normal',
-    high: 'Yüksek',
-    urgent: 'Acil',
-  }[priority];
 }

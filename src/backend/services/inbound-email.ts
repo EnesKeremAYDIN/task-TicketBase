@@ -75,6 +75,7 @@ export async function processInboundEmail(payload: InboundPayload) {
           customer.id,
           tenant.id,
           tenant.slug,
+          'email',
         );
 
         await updateInboundStatus(inboundMessage.id, 'processed', followUpTicket.id);
@@ -93,6 +94,7 @@ export async function processInboundEmail(payload: InboundPayload) {
         tenant.id,
         'public_reply',
         payload.body,
+        'email',
       );
 
       await updateInboundStatus(inboundMessage.id, 'processed', ticket.id);
@@ -119,6 +121,7 @@ export async function processInboundEmail(payload: InboundPayload) {
       customer.id,
       tenant.id,
       tenant.slug,
+      'email',
     );
 
     await updateInboundStatus(inboundMessage.id, 'processed', newTicket.id);

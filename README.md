@@ -115,8 +115,9 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 
 ### Tickets
 - `POST /api/tickets` — Ticket oluştur (müşteri)
-- `GET /api/tickets` — Ticket listesi (agent/admin için tenant geneli, müşteri için yalnızca kendi ticket'ları; filtreli + sayfalı)
+- `GET /api/tickets` — Ticket listesi (agent/admin için tenant geneli, müşteri için yalnızca kendi ticket'ları; filtreli + sayfalı). Destek ekibi `queue=my|unassigned|escalated` parametresiyle aktif iş kuyruklarını açabilir; `my` yalnızca agent rolünde kullanılabilir.
 - `GET /api/tickets/:id` — Ticket detayı
+- `GET /api/tickets/:id/activities` — Sayfalı ticket aktivite geçmişi (müşteri için yalnızca public kayıtlar)
 - `POST /api/tickets/bulk` — En fazla 100 seçili ticket üzerinde durum, öncelik veya ajan işlemi (agent/admin)
 - `PATCH /api/tickets/:id/status` — Rol duyarlı durum güncelleme (agent/admin)
 - `POST /api/tickets/:id/confirm-resolution` — Çözümü onayla ve kapat (ticket sahibi müşteri)
@@ -130,7 +131,7 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 - `POST /api/tickets/:id/comments` — Yorum ekle
 
 ### SLA & Dashboard
-- `GET /api/sla/dashboard` — Dashboard istatistikleri (agent/admin)
+- `GET /api/sla/dashboard` — Yalnızca aktif (`new`, `open`, `pending`) ticketları kapsayan dashboard, ilk yanıt/çözüm ihlal dağılımı ve kuyruk sayaçları (agent/admin)
 - `GET /api/sla/breaches` — SLA ihlal listesi (agent/admin)
 
 ### Diğer
@@ -144,41 +145,45 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 - **38 sabit kullanıcı**: 4 admin + 13 agent + 21 müşteri
 - **100.000 ticket**: Tenant başına 25.000; durum, öncelik ve kategori dağılımı deterministik
 - **400.000 yorum**: Tenant başına 100.000; dağılımı deterministik
+- **341.537 deterministik aktivite**: Oluşturma, durum ve atama olayları ticket başına sorgu olmadan toplu üretilir
 - **7 kategori**: Donanım, Yazılım, Ağ, Erişim, E-posta, Güvenlik, Diğer
 - **Yaşam döngüsü örnekleri**: Pending reminder ve yeniden açılma geçmişi bulunan ticket'lar
 - **SLA deadline'ları**: Veritabanına yazılmadan önce bellekte hesaplanır
+- **SLA ihlal türleri**: İlk yanıt ve çözüm ihlalleri ayrı, toplam ihlal alanıyla uyumlu ve deterministik üretilir
 - **Tekrarlanabilir sonuç**: Seed anahtarı `20260722`; aynı komut aynı kullanıcıları ve içerik dağılımını üretir
 - **Ölçülen `db:reset` süresi**: 65–85 saniye (iki yerel doğrulama çalışması)
 
 ## Test Sonuçları
 
-### Birim Testleri (`npm test`) — 83/83 ✅
+### Birim Testleri (`npm test`) — 105/105 ✅
 
 ```
-Test Files  7 passed (7)
-     Tests  83 passed (83)
+Test Files  9 passed (9)
+     Tests  105 passed (105)
 ```
 
 | Test Dosyası | Test Sayısı | Kapsam |
 |-------------|-------------|--------|
 | auth.test.ts | 10 | Login, token doğrulama, middleware |
 | ticket.test.ts | 16 | CRUD, kategori filtresi, müşteri liste izolasyonu, yorum görünürlüğü, state machine, sequential number, claim/assign |
-| sla.test.ts | 15 | Business hours, sorgusuz SLA hesabı, SLA policy, comments, dashboard |
-| lifecycle.test.ts | 9 | Admin reopen, müşteri çözüm onayı/reddi, pending reminder, follow-up, otomatik kapanma |
+| sla.test.ts | 19 | Business hours, SLA policy, geç/yanıtsız ilk yanıt, geç çözüm ihlalleri, tür ayrımı, comments ve dashboard |
+| lifecycle.test.ts | 10 | Admin reopen, müşteri çözüm onayı/reddi, pending reminder, follow-up ve gerçek hareketsizliğe göre otomatik kapanma |
 | bulk-ticket.test.ts | 9 | Rol yetkileri, state machine, SLA yeniden hesaplama, ajan atama, tenant izolasyonu, 100 kayıt limiti |
+| activity.test.ts | 8 | Actor/zaman, eski-yeni değer, görünürlük, otomatik işlemler, tenant izolasyonu |
+| queue.test.ts | 9 | Aktif dashboard kapsamı, My Tickets, Unassigned & Open, Escalated, rol yetkileri ve filtre uyumu |
 | inbound-email.test.ts | 8 | Webhook, duplicate, validation |
 | extended.test.ts | 16 | Cross-tenant, race, pagination, SLA boundary, search |
 
 ### Performans (`npm run perf`)
 ```
 Ticket Listesi:
-   Ortalama: 3.6ms
-   P95: 5ms
+   Ortalama: 3.9ms
+   P95: 6ms
    Durum: ✅ BAŞARILI (<300ms)
 
 Dashboard:
-   Ortalama: 46.9ms
-   P95: 78ms
+   Ortalama: 50.7ms
+   P95: 65ms
    Durum: ✅ BAŞARILI (<500ms)
 ```
 

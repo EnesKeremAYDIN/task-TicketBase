@@ -9,10 +9,20 @@ import {
   claimTicket,
   assignTicket,
   getComments,
+  getTicketActivities,
   createComment,
 } from '../lib/api';
 import { getAgents } from '../lib/api';
-import type { Ticket as TicketType, Comment, Agent } from '../lib/types';
+import {
+  PRIORITY_LABELS,
+  STATUS_LABELS,
+  type Ticket as TicketType,
+  type TicketActivity,
+  type Comment,
+  type Agent,
+  type Priority,
+  type Status,
+} from '../lib/types';
 import Card from '../components/Card/Card';
 import StatusBadge from '../components/StatusBadge/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge/PriorityBadge';
@@ -29,6 +39,10 @@ function TicketDetail() {
   const navigate = useNavigate();
   const [ticket, setTicket] = useState<TicketType | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [activities, setActivities] = useState<TicketActivity[]>([]);
+  const [activityTotal, setActivityTotal] = useState(0);
+  const [activityPage, setActivityPage] = useState(1);
+  const [activityLoading, setActivityLoading] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [commentType, setCommentType] = useState('public_reply');
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -60,9 +74,16 @@ function TicketDetail() {
     if (!id) return;
     setError('');
     try {
-      const [t, c] = await Promise.all([getTicket(id), getComments(id)]);
+      const [t, c, activityResponse] = await Promise.all([
+        getTicket(id),
+        getComments(id),
+        getTicketActivities(id),
+      ]);
       setTicket(t);
       setComments(c);
+      setActivities(activityResponse.activities);
+      setActivityTotal(activityResponse.total);
+      setActivityPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ticket yüklenirken hata oluştu');
       setTicket(null);
@@ -214,6 +235,62 @@ function TicketDetail() {
     }
   }
 
+  async function loadMoreActivities() {
+    if (!id || activityLoading || activities.length >= activityTotal) return;
+    setActivityLoading(true);
+    try {
+      const nextPage = activityPage + 1;
+      const response = await getTicketActivities(id, nextPage);
+      setActivities((current) => [...current, ...response.activities]);
+      setActivityPage(nextPage);
+      setActivityTotal(response.total);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Geçmiş yüklenemedi');
+    } finally {
+      setActivityLoading(false);
+    }
+  }
+
+  function activityActor(activity: TicketActivity) {
+    return activity.actor?.name || 'Sistem';
+  }
+
+  function activityValue(activity: TicketActivity, value: string | null, label: string | null) {
+    if (label) return label;
+    if (!value) return 'Atanmamış';
+    if (activity.field === 'status') return STATUS_LABELS[value as Status] || value;
+    if (activity.field === 'priority') return PRIORITY_LABELS[value as Priority] || value;
+    return value;
+  }
+
+  function activityDescription(activity: TicketActivity) {
+    const actor = activityActor(activity);
+    const oldValue = activityValue(activity, activity.oldValue, activity.oldLabel);
+    const newValue = activityValue(activity, activity.newValue, activity.newLabel);
+
+    if (activity.type === 'ticket_created') return `${actor} ticket'ı oluşturdu.`;
+    if (activity.type === 'status_changed') {
+      return `${actor} durumu "${oldValue}" değerinden "${newValue}" değerine değiştirdi.`;
+    }
+    if (activity.type === 'priority_changed') {
+      return `${actor} önceliği "${oldValue}" değerinden "${newValue}" değerine değiştirdi.`;
+    }
+    if (activity.type === 'assignee_changed') {
+      return `${actor} atamayı "${oldValue}" değerinden "${newValue}" değerine değiştirdi.`;
+    }
+    return `${actor}, ${activity.newLabel || 'yeni'} takip ticket'ını oluşturdu.`;
+  }
+
+  function activitySourceLabel(source: TicketActivity['source']) {
+    return {
+      web: 'Web',
+      email: 'E-posta',
+      bulk: 'Toplu İşlem',
+      system: 'Sistem',
+      seed: 'Demo Verisi',
+    }[source];
+  }
+
   const statusActions = ticket.allowedActions.filter((action) => (
     ['new', 'open', 'pending', 'resolved', 'closed'].includes(action)
   ));
@@ -234,7 +311,16 @@ function TicketDetail() {
           <h2 className={styles.ticketTitle}>{ticket.displayId}: {ticket.title}</h2>
           <StatusBadge status={ticket.status} />
           <PriorityBadge priority={ticket.priority} />
-          {ticket.slaBreached && <span className={styles.slaBadge}>SLA İhlali</span>}
+          {ticket.firstResponseSlaBreached && (
+            <span className={styles.slaBadge}>İlk Yanıt SLA İhlali</span>
+          )}
+          {ticket.resolutionSlaBreached && (
+            <span className={styles.slaBadge}>Çözüm SLA İhlali</span>
+          )}
+          {ticket.slaBreached
+            && !ticket.firstResponseSlaBreached
+            && !ticket.resolutionSlaBreached
+            && <span className={styles.slaBadge}>SLA İhlali</span>}
         </div>
 
         <div className={styles.ticketMeta}>
@@ -318,6 +404,41 @@ function TicketDetail() {
           {actionError && <p className={styles.actionError}>{actionError}</p>}
         </Card>
       )}
+
+      <Card title="Aktivite Geçmişi" style={{ marginTop: 16 }}>
+        {activities.length === 0 ? (
+          <p className={styles.activityEmpty}>Bu ticket için henüz geçmiş kaydı yok.</p>
+        ) : (
+          <div className={styles.activityTimeline}>
+            {activities.map((activity) => (
+              <div key={activity.id} className={styles.activityItem}>
+                <span className={styles.activityMarker} aria-hidden="true" />
+                <div className={styles.activityContent}>
+                  <div className={styles.activityHeader}>
+                    <span className={styles.activityDate}>
+                      {new Date(activity.createdAt).toLocaleString('tr-TR')}
+                    </span>
+                    <span className={styles.activitySource}>{activitySourceLabel(activity.source)}</span>
+                  </div>
+                  <p className={styles.activityDescription}>{activityDescription(activity)}</p>
+                  {activity.reason && <p className={styles.activityReason}>Neden: {activity.reason}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {activities.length < activityTotal && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={loadMoreActivities}
+            loading={activityLoading}
+            className={styles.activityLoadMore}
+          >
+            Daha Fazla Göster
+          </Button>
+        )}
+      </Card>
 
       <Card title="Yorumlar" style={{ marginTop: 16 }}>
         {comments.length === 0 ? (

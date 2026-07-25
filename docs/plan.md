@@ -16,7 +16,7 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
 - [ ] Dizin yapısını kur: `src/backend/`, `src/frontend/`, `prisma/`, `mock-mail-channel/`, `ai-transcripts/`
 - [ ] `.gitignore`, `.env` dosyalarını oluştur
 - [ ] Prisma şemasını yaz (6 entity):
-  - Tenant, User, Ticket, Comment, SLAPolicy, InboundMessage, Holiday
+  - Tenant, User, Ticket, Comment, TicketActivity, SLAPolicy, InboundMessage, Holiday
   - Unique constraint'ler, index'ler, tenant_id foreign key'leri
 - [ ] Seed script'i yaz: 4 tenant, her tenant'ta 5-15 kullanıcı, ~100k ticket, ~400k yorum
 - [ ] `npm run lint` script'ini ekle
@@ -44,6 +44,7 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
   - Transaction + unique constraint ile race condition koruması
 - [ ] Ticket listeleme: durum/öncelik/atanan/kategori filtreleri, arama, sayfalama, son yorum önizlemesi
 - [ ] Ticket detay endpoint'i
+- [ ] Sayfalı ve rol kontrollü ticket activity/audit endpoint'i
 - [ ] "Üstlen" endpoint'i (row-level lock ile tek başarılı atama)
 - [ ] Admin atama endpoint'i
 - [ ] **`npm run race-test` script'ini yaz ve yeşil yap**
@@ -71,8 +72,10 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
 - [ ] Tatil tablosu entegrasyonu (seed'deki holiday verisiyle)
 - [ ] SLA deadline hesaplama (ilk yanıt + çözüm) — yaz saati geçişleri dahil
 - [ ] SLA hedefleri: urgent(1s/8s), high(4s/24s), normal(8s/3gün), low(24s/5gün)
-- [ ] `sla_breached` işaretleme mekanizması
-- [ ] İlk `public_reply` SLA ilk yanıt süresini durdurma
+- [ ] İlk yanıt ve çözüm SLA ihlallerini ayrı işaretleme; toplam ihlal alanını uyumlu tutma
+- [ ] İlk agent/admin `public_reply` sırasında ilk yanıt ihlalini atomik hesaplama; müşteri yorumunu ilk yanıt saymama
+- [ ] `resolved` geçişinde çözüm ihlalini atomik hesaplama
+- [ ] Periyodik SLA taramasını olay anındaki hesaplamalara güvenlik ağı olarak çalıştırma
 
 ---
 
@@ -82,7 +85,11 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
 - [ ] Login sayfası (Türkçe arayüz)
 - [ ] Ticket listesi sayfası: filtreler, arama, sayfalama, son yorum önizlemesi
 - [ ] Ticket detay sayfası: yorum geçmişi, yorum yazma (public_reply/internal_note ayrımı)
+- [ ] Ticket detay sayfası: durum, öncelik, atama ve sistem olayları için aktivite zaman çizelgesi
 - [ ] Dashboard: açık ticket sayıları (durum/öncelik kırılımı), SLA ihlalleri, agent başına iş yükü
+- [x] Dashboard sorgularını aktif durumlarla (`new`, `open`, `pending`) sınırla
+- [x] Agent için `My Tickets`, destek ekibi için `Unassigned & Open` ve `Escalated` kuyruklarını ekle
+- [x] Kuyruk yetkilerini, mevcut filtrelerle uyumu ve aktif dashboard kapsamını izole testlerle doğrula
 - [ ] İşletim Kuralları sayfası (sabit config: 5 gün kapanma, 4 saat high hedefi, 09-18 mesai, 24s webhook retry)
 - [ ] Yorum görünürlük: müşteri sadece public_reply görür, agent/admin ikisini de görür
 - [ ] Tüm UI metinleri Türkçe, Türkçe karakterler doğru kullanılacak

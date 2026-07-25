@@ -1,7 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listTickets, createTicket, bulkUpdateTickets, claimTicket, getDashboard, getRules, getAgents } from '../lib/api';
-import type { Ticket, Priority, Status, Agent, BulkTicketOperation, BulkTicketResult } from '../lib/types';
+import type {
+  Ticket,
+  Priority,
+  Status,
+  Agent,
+  BulkTicketOperation,
+  BulkTicketResult,
+  DashboardStats,
+  TicketQueue,
+} from '../lib/types';
 import Card from '../components/Card/Card';
 import StatusBadge from '../components/StatusBadge/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge/PriorityBadge';
@@ -15,21 +24,29 @@ import EmptyState from '../components/EmptyState/EmptyState';
 import Modal from '../components/Modal/Modal';
 import styles from './TicketList.module.css';
 
-interface DashboardStats {
-  statusBreakdown: Record<string, number>;
-  priorityBreakdown: Record<string, number>;
-  slaBreached: number;
-  agentWorkload: Record<string, number>;
-}
-
 interface Rule { kural: string; deger: string; }
 
 function TicketList() {
   const navigate = useNavigate();
+  let user = {};
+  try {
+    const raw = localStorage.getItem('user');
+    if (raw) user = JSON.parse(raw);
+  } catch {
+    user = {};
+  }
+
+  const userRole = (user as { role?: string }).role;
+  const isAgent = userRole === 'agent' || userRole === 'admin';
+  const canViewTickets = userRole === 'customer' || isAgent;
+
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
+  const [queueFilter, setQueueFilter] = useState<TicketQueue | ''>(
+    userRole === 'agent' ? 'my' : '',
+  );
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [agentFilter, setAgentFilter] = useState('');
@@ -56,18 +73,6 @@ function TicketList() {
   const [bulkResult, setBulkResult] = useState<BulkTicketResult | null>(null);
   const [bulkError, setBulkError] = useState('');
 
-  let user = {};
-  try {
-    const raw = localStorage.getItem('user');
-    if (raw) user = JSON.parse(raw);
-  } catch {
-    user = {};
-  }
-
-  const userRole = (user as { role?: string }).role;
-  const isAgent = userRole === 'agent' || userRole === 'admin';
-  const canViewTickets = userRole === 'customer' || isAgent;
-
   const statusLabels: Record<string, string> = {
     new: 'Yeni', open: 'Açık', pending: 'Beklemede', resolved: 'Çözüldü', closed: 'Kapalı',
   };
@@ -77,6 +82,7 @@ function TicketList() {
     setLoading(true);
     try {
       const params: Record<string, string> = { page: String(page), limit: String(limit) };
+      if (queueFilter) params.queue = queueFilter;
       if (statusFilter) params.status = statusFilter;
       if (priorityFilter) params.priority = priorityFilter;
       if (agentFilter) params.assignedToId = agentFilter;
@@ -90,37 +96,55 @@ function TicketList() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, statusFilter, priorityFilter, agentFilter, search, canViewTickets]);
+  }, [page, limit, queueFilter, statusFilter, priorityFilter, agentFilter, search, canViewTickets]);
 
   useEffect(() => {
     if (isAgent) {
-      Promise.all([getDashboard(), getRules(), getAgents()])
-        .then(([s, r, agents]) => {
-          setStats(s as DashboardStats);
-          setRules((r as { rules: Rule[] }).rules);
+      Promise.all([getDashboard(), getAgents()])
+        .then(([dashboard, agents]) => {
+          setStats(dashboard);
           const agentList = agents as Agent[];
           setAgentOptions([
             { value: '', label: 'Tümü' },
-            { value: 'unassigned', label: 'Atanmamış' },
             ...agentList.map((a) => ({ value: a.id, label: a.name })),
           ]);
           setAgentMap(Object.fromEntries(agentList.map((a) => [a.id, a.name])));
         })
         .catch(() => {});
+
+      if (userRole === 'admin') {
+        getRules()
+          .then((response) => setRules((response as { rules: Rule[] }).rules))
+          .catch(() => {});
+      } else {
+        setRules([]);
+      }
     }
     load();
-  }, [load, isAgent]);
+  }, [load, isAgent, userRole]);
 
   useEffect(() => {
     setSelectedTicketIds([]);
     setBulkResult(null);
-  }, [page, limit, statusFilter, priorityFilter, agentFilter, search]);
+  }, [page, limit, queueFilter, statusFilter, priorityFilter, agentFilter, search]);
 
   function handleSearch() {
     setPage(1);
   }
 
   function handleFilterChange() {
+    setPage(1);
+  }
+
+  function handleQueueChange(queue: TicketQueue | '') {
+    setQueueFilter(queue);
+    setAgentFilter('');
+    setPage(1);
+  }
+
+  function handleAgentFilterChange(agentId: string) {
+    setAgentFilter(agentId);
+    setQueueFilter('');
     setPage(1);
   }
 
@@ -282,7 +306,16 @@ function TicketList() {
   const bulkAgentOptions = [
     { value: '', label: 'Ajan seçin' },
     { value: 'unassigned', label: 'Atamayı kaldır' },
-    ...agentOptions.filter((option) => option.value && option.value !== 'unassigned'),
+    ...agentOptions.filter((option) => option.value),
+  ];
+
+  const queueOptions: Array<{ value: TicketQueue | ''; label: string; count?: number }> = [
+    { value: '', label: 'Tüm Ticketlar' },
+    ...(userRole === 'agent'
+      ? [{ value: 'my' as const, label: 'My Tickets', count: stats?.queueCounts.myTickets }]
+      : []),
+    { value: 'unassigned', label: 'Unassigned & Open', count: stats?.queueCounts.unassignedOpen },
+    { value: 'escalated', label: 'Escalated', count: stats?.queueCounts.escalated },
   ];
 
   const allCurrentPageSelected = tickets.length > 0
@@ -300,15 +333,15 @@ function TicketList() {
     <div>
       {isAgent && stats && (
         <div className={styles.dashboardGrid}>
-          <Card title="Durum Dağılımı">
-            {(['new', 'open', 'pending', 'resolved', 'closed'] as const).map((k) => (
+          <Card title={`Aktif Durum Dağılımı (${stats.activeTotal})`}>
+            {(['new', 'open', 'pending'] as const).map((k) => (
               <div key={k} className={styles.statRow}>
                 <span>{statusLabels[k]}</span>
                 <strong>{stats.statusBreakdown[k] || 0}</strong>
               </div>
             ))}
           </Card>
-          <Card title="Öncelik Dağılımı">
+          <Card title="Aktif Ticket Öncelikleri">
             {(['urgent', 'high', 'normal', 'low'] as const).map((k) => (
               <div key={k} className={styles.statRow}>
                 <PriorityBadge priority={k} />
@@ -316,11 +349,19 @@ function TicketList() {
               </div>
             ))}
           </Card>
-          <Card title="SLA İhlalleri">
+          <Card title="Aktif SLA İhlalleri">
             <p className={styles.slaCount} style={{ color: stats.slaBreached > 0 ? 'var(--danger)' : 'var(--success)' }}>
               {stats.slaBreached}
             </p>
             {stats.slaBreached > 0 && <p className={styles.slaText}>Ticket SLA süresini aştı</p>}
+            <div className={styles.statRow}>
+              <span>İlk yanıt</span>
+              <strong>{stats.slaBreachBreakdown.firstResponse}</strong>
+            </div>
+            <div className={styles.statRow}>
+              <span>Çözüm</span>
+              <strong>{stats.slaBreachBreakdown.resolution}</strong>
+            </div>
           </Card>
           <Card title="Ajan İş Yükü">
             {Object.entries(stats.agentWorkload).length === 0 ? (
@@ -362,6 +403,22 @@ function TicketList() {
       )}
 
       {isAgent && (
+        <nav className={styles.queueBar} aria-label="Ticket kuyrukları">
+          {queueOptions.map((option) => (
+            <Button
+              key={option.value || 'all'}
+              size="sm"
+              variant={queueFilter === option.value ? 'primary' : 'secondary'}
+              onClick={() => handleQueueChange(option.value)}
+              aria-pressed={queueFilter === option.value}
+            >
+              {option.label}{option.count !== undefined ? ` (${option.count})` : ''}
+            </Button>
+          ))}
+        </nav>
+      )}
+
+      {isAgent && (
         <div className={styles.filterRow}>
           <div className={styles.filterSelect}>
             <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); handleFilterChange(); }} options={statusOptions} />
@@ -370,7 +427,7 @@ function TicketList() {
             <Select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); handleFilterChange(); }} options={priorityOptions} />
           </div>
           <div className={styles.filterSelectWide}>
-            <Select value={agentFilter} onChange={(e) => { setAgentFilter(e.target.value); handleFilterChange(); }} options={agentOptions} />
+            <Select value={agentFilter} onChange={(e) => handleAgentFilterChange(e.target.value)} options={agentOptions} />
           </div>
           <div className={styles.searchGroup}>
             <div className={styles.searchInput}>

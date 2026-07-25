@@ -158,14 +158,16 @@ describe('Bulk Ticket İşlemleri', () => {
     expect(updated.every((ticket) => ticket.priority === 'urgent')).toBe(true);
     expect(updated.every((ticket) => ticket.firstResponseSlaDue && ticket.slaDueAt)).toBe(true);
 
-    const auditNotes = await prisma.comment.count({
+    const activityCount = await prisma.ticketActivity.count({
       where: {
         ticketId: { in: [first.id, second.id] },
-        type: 'internal_note',
-        body: { contains: 'Toplu işlem: Öncelik' },
+        type: 'priority_changed',
+        oldValue: 'normal',
+        newValue: 'urgent',
+        source: 'bulk',
       },
     });
-    expect(auditNotes).toBe(2);
+    expect(activityCount).toBe(2);
   });
 
   it('agent yalnızca atanmamış ticketları kendine alabilmeli', async () => {

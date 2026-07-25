@@ -51,13 +51,6 @@ interface TicketResponse {
   limit: number;
 }
 
-interface DashboardStats {
-  statusBreakdown: Record<string, number>;
-  priorityBreakdown: Record<string, number>;
-  slaBreached: number;
-  agentWorkload: Record<string, number>;
-}
-
 interface RuleItem {
   kural: string;
   deger: string;
@@ -140,6 +133,12 @@ export async function getComments(ticketId: string) {
   return request<import('./types').Comment[]>(`/tickets/${ticketId}/comments`);
 }
 
+export async function getTicketActivities(ticketId: string, page = 1, limit = 50) {
+  return request<import('./types').TicketActivityResponse>(
+    `/tickets/${ticketId}/activities?page=${page}&limit=${limit}`,
+  );
+}
+
 export async function createComment(ticketId: string, type: string, body: string) {
   return request<import('./types').Comment>(`/tickets/${ticketId}/comments`, {
     method: 'POST',
@@ -148,7 +147,7 @@ export async function createComment(ticketId: string, type: string, body: string
 }
 
 export async function getDashboard() {
-  return request<DashboardStats>('/sla/dashboard');
+  return request<import('./types').DashboardStats>('/sla/dashboard');
 }
 
 export async function getSlaBreaches(page = 1) {

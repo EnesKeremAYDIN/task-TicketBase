@@ -19,6 +19,9 @@
 .createCard {
   margin-bottom: 16px;
 }
+.queueBar {
+  display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+}
 .filterRow {
   display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap;
 }
