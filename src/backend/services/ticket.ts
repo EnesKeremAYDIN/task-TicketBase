@@ -222,6 +222,19 @@ export async function listTickets(params: ListTicketsParams) {
   return { tickets: ticketsWithLastComment, total, page: params.page, limit: params.limit };
 }
 
+export async function listTicketCategories(tenantId: string) {
+  const categories = await prisma.ticket.findMany({
+    where: { tenantId, category: { not: null } },
+    select: { category: true },
+    distinct: ['category'],
+    orderBy: { category: 'asc' },
+  });
+
+  return categories
+    .map((ticket) => ticket.category)
+    .filter((category): category is string => Boolean(category));
+}
+
 export async function getTicketById(ticketId: string, tenantId: string, userId?: string, userRole?: string) {
   const ticket = await prisma.ticket.findFirst({
     where: { id: ticketId, ...tenantFilter(tenantId) },

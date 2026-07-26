@@ -5,6 +5,7 @@ import { ForbiddenError, ValidationError } from '../lib/errors';
 import {
   createTicket,
   listTickets,
+  listTicketCategories,
   getTicketById,
   updateTicketStatus,
   confirmResolution,
@@ -135,6 +136,11 @@ export async function ticketRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return result;
+  });
+
+  app.get('/api/ticket-categories', async (request, _reply) => {
+    const user = requireRole(request, ['customer', 'agent', 'admin']);
+    return listTicketCategories(user.tenantId);
   });
 
   app.get('/api/tickets/:id', async (request, _reply) => {

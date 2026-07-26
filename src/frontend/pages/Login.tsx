@@ -5,6 +5,7 @@ import Button from '../components/Button/Button';
 import Input from '../components/Input/Input';
 import Card from '../components/Card/Card';
 import styles from './Login.module.css';
+import { getDefaultPath } from '../lib/auth-user';
 
 function Login() {
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ function Login() {
     try {
       const user = await login(email, password);
       localStorage.setItem('user', JSON.stringify(user));
-      navigate('/tickets');
+      navigate(getDefaultPath(user));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Giriş başarısız');
     } finally {

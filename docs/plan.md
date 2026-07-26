@@ -81,18 +81,20 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
 
 ## Aşama 6 — Frontend (React)
 
-- [ ] Vite + React + TypeScript kurulumu
-- [ ] Login sayfası (Türkçe arayüz)
-- [ ] Ticket listesi sayfası: filtreler, arama, sayfalama, son yorum önizlemesi
-- [ ] Ticket detay sayfası: yorum geçmişi, yorum yazma (public_reply/internal_note ayrımı)
-- [ ] Ticket detay sayfası: durum, öncelik, atama ve sistem olayları için aktivite zaman çizelgesi
-- [ ] Dashboard: açık ticket sayıları (durum/öncelik kırılımı), SLA ihlalleri, agent başına iş yükü
+- [x] Vite + React + ayrı strict TypeScript kontrolü
+- [x] Login sayfası (Türkçe arayüz)
+- [x] Ticket listesi sayfası: URL tabanlı filtreler, debounce arama, sayfalama, kategori ve son yorum önizlemesi
+- [x] Ticket detay sayfası: yorum geçmişi, yorum yazma (public_reply/internal_note ayrımı)
+- [x] Ticket detay sayfası: durum, öncelik, atama ve sistem olayları için aktivite zaman çizelgesi
+- [x] Dashboard: açık ticket sayıları (durum/öncelik kırılımı), SLA ihlalleri, agent başına iş yükü
 - [x] Dashboard sorgularını aktif durumlarla (`new`, `open`, `pending`) sınırla
 - [x] Agent için `My Tickets`, destek ekibi için `Unassigned & Open` ve `Escalated` kuyruklarını ekle
 - [x] Kuyruk yetkilerini, mevcut filtrelerle uyumu ve aktif dashboard kapsamını izole testlerle doğrula
-- [ ] İşletim Kuralları sayfası (sabit config: 5 gün kapanma, 4 saat high hedefi, 09-18 mesai, 24s webhook retry)
-- [ ] Yorum görünürlük: müşteri sadece public_reply görür, agent/admin ikisini de görür
-- [ ] Tüm UI metinleri Türkçe, Türkçe karakterler doğru kullanılacak
+- [x] Dashboard, ticket listesi ve admin İşletim Kuralları için ayrı sayfa yapısı
+- [x] İşletim Kuralları sayfası (sabit config: 5 gün kapanma, 4 saat high hedefi, 09-18 mesai, 24s webhook retry)
+- [x] Responsive navigasyon, filtreler, tablolar ve erişilebilir modal davranışı
+- [x] Yorum görünürlük: müşteri sadece public_reply görür, agent/admin ikisini de görür
+- [x] Tüm UI metinleri Türkçe, Türkçe karakterler doğru kullanılacak
 
 ---
 

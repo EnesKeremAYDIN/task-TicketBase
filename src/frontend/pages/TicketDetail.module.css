@@ -18,7 +18,7 @@
   color: var(--danger); font-weight: 600; font-size: 0.85rem;
 }
 .ticketMeta {
-  display: flex; gap: 16px; color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px;
+  display: flex; gap: 16px; color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px; flex-wrap: wrap;
 }
 .ticketDesc {
   color: var(--text-secondary); line-height: 1.6;
@@ -39,7 +39,7 @@
 .actionError {
   color: var(--danger); font-size: 0.85rem;
 }
-.commentCard {
+.sectionCard {
   margin-top: 16px;
 }
 .commentEmpty {
@@ -111,4 +111,30 @@
 }
 .activityLoadMore {
   margin-top: 16px;
+}
+
+@media (max-width: 600px) {
+  .ticketHeader {
+    align-items: flex-start;
+  }
+
+  .ticketTitle {
+    width: calc(100% - 44px);
+  }
+
+  .ticketMeta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .actionBar > button,
+  .formActions > button {
+    flex: 1 1 100%;
+  }
+
+  .commentHeader {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
 }

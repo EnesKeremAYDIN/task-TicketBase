@@ -41,7 +41,7 @@ async function request<T = unknown>(path: string, options: RequestInit = {}): Pr
 
 interface LoginResponse {
   token: string;
-  user: { id: string; name: string; email: string; role: string; tenant: { id: string; slug: string; name: string } };
+  user: import('./types').User;
 }
 
 interface TicketResponse {
@@ -51,13 +51,8 @@ interface TicketResponse {
   limit: number;
 }
 
-interface RuleItem {
-  kural: string;
-  deger: string;
-}
-
 interface RulesResponse {
-  rules: RuleItem[];
+  rules: import('./types').OperatingRule[];
 }
 
 export async function login(email: string, password: string) {
@@ -160,4 +155,8 @@ export async function getRules() {
 
 export async function getAgents() {
   return request<import('./types').Agent[]>('/agents');
+}
+
+export async function getTicketCategories() {
+  return request<string[]>('/ticket-categories');
 }

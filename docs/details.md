@@ -115,6 +115,9 @@
 - **Agent görünümü:** tenant ticket listesi; durum/öncelik/atanan/kategori filtreleri, arama, sayfalama, son yorum önizlemesi
 - **Dashboard:** yalnızca `new`, `open`, `pending` ticket sayıları (durum + öncelik kırılımı), aktif SLA ihlalleri ve agent başına aktif iş yükü
 - **Destek kuyrukları:** agent için `My Tickets`; agent/admin için `Unassigned & Open` ve `Escalated`. Kuyruk seçimi mevcut filtreler, arama ve sayfalama ile birlikte çalışır
+- **Paylaşılabilir görünüm:** kuyruk, filtre, arama ve sayfalama durumu URL parametrelerinde saklanır; arama 350 ms debounce ile çalışır
+- **Bilgi mimarisi:** dashboard, ticket listesi ve admin işletim kuralları ayrı rotalarda sunulur
+- **Erişilebilir ve responsive arayüz:** küçük ekranlarda içerik sayfa dışına taşmaz; modallar focus trap, Escape ve odağa dönüş davranışlarını uygular
 - 100k seed verisiyle **akıcı** çalışmalı (NFR-01)
 
 ### FR-08 — İşletim Kuralları Ekranı

@@ -7,3 +7,28 @@
 .ellipsis { padding: 0 4px; color: var(--text-secondary); font-size: 0.85rem; }
 .separator { width: 1px; height: 24px; background: var(--border); margin: 0 8px; }
 .perPage { font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap; }
+
+@media (max-width: 600px) {
+  .wrapper {
+    align-items: stretch;
+  }
+
+  .info {
+    width: 100%;
+  }
+
+  .controls {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .separator {
+    display: none;
+  }
+
+  .perPage {
+    width: 100%;
+    margin-top: 4px;
+    text-align: center;
+  }
+}

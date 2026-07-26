@@ -1,15 +1,3 @@
-.dashboardGrid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 20px;
-}
-.statRow {
-  display: flex; justify-content: space-between; padding: 2px 0; font-size: 0.85rem;
-}
-.slaCount {
-  font-size: 1.8rem; font-weight: 700; margin: 0;
-}
-.slaText {
-  color: var(--text-secondary); font-size: 0.85rem;
-}
 .headerRow {
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
 }
@@ -18,6 +6,9 @@
 }
 .createCard {
   margin-bottom: 16px;
+}
+.formSubmit {
+  margin-top: 8px;
 }
 .queueBar {
   display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
@@ -74,11 +65,13 @@
 .checkboxCell input {
   width: 16px; height: 16px; cursor: pointer;
 }
-.tableCard {
-  /* uses Card styles */
+.tableScroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .table {
-  width: 100%; border-collapse: collapse;
+  width: 100%; min-width: 760px; border-collapse: collapse;
 }
 .clickableRow {
   cursor: pointer;
@@ -93,19 +86,71 @@
 .errorText {
   color: var(--danger); font-size: 0.85rem;
 }
-.customerMsg {
-  /* Card içinde p için */
-}
-.rulesCard {
-  margin-top: 24px;
-}
-.rulesTable {
-  width: 100%; border-collapse: collapse;
-}
-
 @media (max-width: 720px) {
+  .headerRow {
+    align-items: flex-start;
+  }
+
+  .filterRow {
+    align-items: stretch;
+  }
+
+  .filterSelect,
+  .filterSelectWide,
+  .searchGroup {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .searchGroup {
+    align-items: stretch;
+  }
+
   .bulkControl,
   .bulkControlWide {
+    width: 100%;
+  }
+
+  .bulkHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .table {
+    min-width: 560px;
+  }
+
+  .hideTablet {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .headerRow {
+    gap: 12px;
+  }
+
+  .headerTitle {
+    font-size: 1.15rem;
+  }
+
+  .queueBar > button {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  .table {
+    min-width: 480px;
+  }
+
+  .hideMobile {
+    display: none;
+  }
+
+  .bulkConfirmActions {
+    flex-direction: column-reverse;
+  }
+
+  .bulkConfirmActions > button {
     width: 100%;
   }
 }

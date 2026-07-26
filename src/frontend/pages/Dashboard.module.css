@@ -1,0 +1,97 @@
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.title {
+  color: var(--deep-space-blue);
+  font-size: 1.55rem;
+}
+
+.subtitle,
+.muted {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.primaryLink {
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--white);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.primaryLink:hover {
+  background: var(--primary-hover);
+  color: var(--white);
+}
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.statRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 0.87rem;
+}
+
+.slaDanger,
+.slaSuccess {
+  margin-bottom: 8px;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.slaDanger {
+  color: var(--danger);
+}
+
+.slaSuccess {
+  color: var(--success);
+}
+
+.queueGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.queueLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.queueLink:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+@media (max-width: 600px) {
+  .pageHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .primaryLink {
+    width: 100%;
+    text-align: center;
+  }
+}

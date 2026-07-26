@@ -130,6 +130,14 @@ describe('Ticket CRUD', () => {
     const body = JSON.parse(listResponse.body);
     expect(body.total).toBe(1);
     expect(body.tickets[0].category).toBe('Ağ');
+
+    const categoryResponse = await app.inject({
+      method: 'GET',
+      url: '/api/ticket-categories',
+      headers: { authorization: `Bearer ${agentToken}` },
+    });
+    expect(categoryResponse.statusCode).toBe(200);
+    expect(JSON.parse(categoryResponse.body)).toContain('Ağ');
   });
 
   it('ticket numarası ardışık olmalı', async () => {

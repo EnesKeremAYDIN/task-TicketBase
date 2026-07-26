@@ -58,6 +58,7 @@ function TicketDetail() {
   const [followUpDescription, setFollowUpDescription] = useState('');
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
+  const [agentLoadError, setAgentLoadError] = useState('');
 
   let user = {};
   try {
@@ -97,7 +98,15 @@ function TicketDetail() {
   useEffect(() => {
     if (isAdmin) {
       setAgentsLoading(true);
-      getAgents().then(setAgents).catch(() => {}).finally(() => setAgentsLoading(false));
+      setAgentLoadError('');
+      getAgents()
+        .then(setAgents)
+        .catch((loadError) => {
+          setAgentLoadError(
+            loadError instanceof Error ? loadError.message : 'Ajan listesi yüklenemedi',
+          );
+        })
+        .finally(() => setAgentsLoading(false));
     }
   }, [isAdmin]);
 
@@ -363,6 +372,8 @@ function TicketDetail() {
       <Modal open={showAssign} onClose={() => setShowAssign(false)} title="Ajan Ata">
         {agentsLoading ? (
           <p className={styles.assignLoading}>Ajanlar yükleniyor...</p>
+        ) : agentLoadError ? (
+          <p className={styles.actionError}>{agentLoadError}</p>
         ) : (
           <>
             <Select label="Ajan Seç" value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)} options={agents.map((a) => ({ value: a.id, label: a.name }))} />
@@ -385,7 +396,7 @@ function TicketDetail() {
       </Modal>
 
       {isCustomer && ticket.allowedActions.includes('confirm_resolution') && (
-        <Card title="Çözüm Onayı" style={{ marginTop: 16 }}>
+        <Card title="Çözüm Onayı" className={styles.sectionCard}>
           <p className={styles.lifecycleInfo}>Sorununuz çözüldüyse ticket'ı kapatabilir, devam ediyorsa yeniden açabilirsiniz.</p>
           <Textarea label="Sorun devam ediyorsa açıklayın" value={resolutionReason} onChange={(e) => setResolutionReason(e.target.value)} />
           <div className={styles.formActions}>
@@ -397,7 +408,7 @@ function TicketDetail() {
       )}
 
       {isCustomer && ticket.allowedActions.includes('create_follow_up') && (
-        <Card title="Yeni Takip Ticket'ı" style={{ marginTop: 16 }}>
+        <Card title="Yeni Takip Ticket'ı" className={styles.sectionCard}>
           <p className={styles.lifecycleInfo}>Bu ticket kapalıdır. Yeni mesajınız ayrı bir ticket olarak oluşturulup bu kayda bağlanacaktır.</p>
           <Textarea label="Yeni Talebiniz" value={followUpDescription} onChange={(e) => setFollowUpDescription(e.target.value)} required />
           <Button onClick={handleFollowUp} disabled={!followUpDescription.trim()} style={{ marginTop: 8 }}>Takip Ticket'ı Oluştur</Button>
@@ -405,7 +416,7 @@ function TicketDetail() {
         </Card>
       )}
 
-      <Card title="Aktivite Geçmişi" style={{ marginTop: 16 }}>
+      <Card title="Aktivite Geçmişi" className={styles.sectionCard}>
         {activities.length === 0 ? (
           <p className={styles.activityEmpty}>Bu ticket için henüz geçmiş kaydı yok.</p>
         ) : (
@@ -440,7 +451,7 @@ function TicketDetail() {
         )}
       </Card>
 
-      <Card title="Yorumlar" style={{ marginTop: 16 }}>
+      <Card title="Yorumlar" className={styles.sectionCard}>
         {comments.length === 0 ? (
           <p className={styles.commentEmpty}>Henüz yorum yok.</p>
         ) : (

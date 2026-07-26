@@ -9,3 +9,39 @@
 .spacer { flex: 1; }
 .userInfo { font-size: 0.85rem; color: var(--text-secondary); }
 .main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+@media (max-width: 720px) {
+  .nav {
+    gap: 12px;
+    height: auto;
+    min-height: 56px;
+    padding: 10px 16px;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    margin-right: 4px;
+  }
+
+  .userInfo {
+    display: none;
+  }
+
+  .main {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav {
+    gap: 8px 12px;
+  }
+
+  .brand {
+    flex-basis: 100%;
+  }
+
+  .link {
+    font-size: 0.82rem;
+  }
+}

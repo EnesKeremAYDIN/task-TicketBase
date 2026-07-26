@@ -1,0 +1,17 @@
+.pageHeader {
+  margin-bottom: 20px;
+}
+
+.title {
+  color: var(--deep-space-blue);
+  font-size: 1.55rem;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}

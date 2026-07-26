@@ -3,3 +3,9 @@
   padding: 20px; box-shadow: var(--shadow);
 }
 .title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+
+@media (max-width: 600px) {
+  .card {
+    padding: 16px;
+  }
+}

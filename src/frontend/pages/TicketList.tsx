@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { listTickets, createTicket, bulkUpdateTickets, claimTicket, getDashboard, getRules, getAgents } from '../lib/api';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  listTickets,
+  createTicket,
+  bulkUpdateTickets,
+  claimTicket,
+  getAgents,
+  getTicketCategories,
+} from '../lib/api';
 import type {
   Ticket,
   Priority,
@@ -8,7 +15,6 @@ import type {
   Agent,
   BulkTicketOperation,
   BulkTicketResult,
-  DashboardStats,
   TicketQueue,
 } from '../lib/types';
 import Card from '../components/Card/Card';
@@ -22,45 +28,65 @@ import Textarea from '../components/Textarea/Textarea';
 import Loading from '../components/Loading/Loading';
 import EmptyState from '../components/EmptyState/EmptyState';
 import Modal from '../components/Modal/Modal';
+import ErrorBanner from '../components/ErrorBanner/ErrorBanner';
+import { getStoredUser } from '../lib/auth-user';
 import styles from './TicketList.module.css';
 
-interface Rule { kural: string; deger: string; }
+const VALID_QUEUES: TicketQueue[] = ['my', 'unassigned', 'escalated'];
+const VALID_STATUSES: Status[] = ['new', 'open', 'pending', 'resolved', 'closed'];
+const VALID_PRIORITIES: Priority[] = ['low', 'normal', 'high', 'urgent'];
+
+function parsePositiveInteger(value: string | null, fallback: number, maximum?: number) {
+  const parsed = Number.parseInt(value || '', 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return maximum ? Math.min(parsed, maximum) : parsed;
+}
 
 function TicketList() {
   const navigate = useNavigate();
-  let user = {};
-  try {
-    const raw = localStorage.getItem('user');
-    if (raw) user = JSON.parse(raw);
-  } catch {
-    user = {};
-  }
-
-  const userRole = (user as { role?: string }).role;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const user = getStoredUser();
+  const userRole = user?.role;
   const isAgent = userRole === 'agent' || userRole === 'admin';
   const canViewTickets = userRole === 'customer' || isAgent;
+  const requestedQueue = searchParams.get('queue');
+  const queueFilter = (
+    requestedQueue
+    && VALID_QUEUES.includes(requestedQueue as TicketQueue)
+    && !(requestedQueue === 'my' && userRole !== 'agent')
+  ) ? requestedQueue as TicketQueue : '';
+  const requestedStatus = searchParams.get('status');
+  const statusFilter = requestedStatus && VALID_STATUSES.includes(requestedStatus as Status)
+    ? requestedStatus
+    : '';
+  const requestedPriority = searchParams.get('priority');
+  const priorityFilter = requestedPriority && VALID_PRIORITIES.includes(requestedPriority as Priority)
+    ? requestedPriority
+    : '';
+  const categoryFilter = searchParams.get('category') || '';
+  const agentFilter = searchParams.get('agent') || '';
+  const search = searchParams.get('q') || '';
+  const page = parsePositiveInteger(searchParams.get('page'), 1);
+  const limit = parsePositiveInteger(searchParams.get('limit'), 20, 100);
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
-  const [queueFilter, setQueueFilter] = useState<TicketQueue | ''>(
-    userRole === 'agent' ? 'my' : '',
-  );
-  const [statusFilter, setStatusFilter] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('');
-  const [agentFilter, setAgentFilter] = useState('');
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState(search);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newPrio, setNewPrio] = useState('normal');
-  const [error, setError] = useState('');
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [rules, setRules] = useState<Rule[]>([]);
-  const [agentOptions, setAgentOptions] = useState<{ value: string; label: string }[]>([]);
-  const [agentMap, setAgentMap] = useState<Record<string, string>>({});
+  const [createError, setCreateError] = useState('');
+  const [listError, setListError] = useState('');
+  const [agentError, setAgentError] = useState('');
+  const [categoryError, setCategoryError] = useState('');
+  const [agentOptions, setAgentOptions] = useState<{ value: string; label: string }[]>([
+    { value: '', label: 'Tüm Ajanlar' },
+  ]);
+  const [categoryOptions, setCategoryOptions] = useState<{ value: string; label: string }[]>([
+    { value: '', label: 'Tüm Kategoriler' },
+  ]);
   const [selectedTicketIds, setSelectedTicketIds] = useState<string[]>([]);
   const [bulkOperation, setBulkOperation] = useState('');
   const [bulkStatus, setBulkStatus] = useState<Exclude<Status, 'new'>>('open');
@@ -77,79 +103,163 @@ function TicketList() {
     new: 'Yeni', open: 'Açık', pending: 'Beklemede', resolved: 'Çözüldü', closed: 'Kapalı',
   };
 
+  const updateUrl = useCallback((
+    updates: Record<string, string | null>,
+    replace = false,
+  ) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    });
+    setSearchParams(next, { replace });
+  }, [searchParams, setSearchParams]);
+
   const load = useCallback(async () => {
     if (!canViewTickets) return;
     setLoading(true);
+    setListError('');
     try {
       const params: Record<string, string> = { page: String(page), limit: String(limit) };
       if (queueFilter) params.queue = queueFilter;
       if (statusFilter) params.status = statusFilter;
       if (priorityFilter) params.priority = priorityFilter;
+      if (categoryFilter) params.category = categoryFilter;
       if (agentFilter) params.assignedToId = agentFilter;
       if (search) params.search = search;
       const data = await listTickets(params);
       setTickets(data.tickets);
       setTotal(data.total);
-    } catch {
+    } catch (loadError) {
       setTickets([]);
       setTotal(0);
+      setListError(loadError instanceof Error ? loadError.message : 'Ticketlar yüklenemedi');
     } finally {
       setLoading(false);
     }
-  }, [page, limit, queueFilter, statusFilter, priorityFilter, agentFilter, search, canViewTickets]);
+  }, [
+    page,
+    limit,
+    queueFilter,
+    statusFilter,
+    priorityFilter,
+    categoryFilter,
+    agentFilter,
+    search,
+    canViewTickets,
+  ]);
+
+  const loadFilterOptions = useCallback(async () => {
+    if (!isAgent) return;
+    const [agentsResult, categoriesResult] = await Promise.allSettled([
+      getAgents(),
+      getTicketCategories(),
+    ]);
+
+    if (agentsResult.status === 'fulfilled') {
+      const agentList = agentsResult.value as Agent[];
+      setAgentError('');
+      setAgentOptions([
+        { value: '', label: 'Tüm Ajanlar' },
+        ...agentList.map((agent) => ({ value: agent.id, label: agent.name })),
+      ]);
+    } else {
+      setAgentOptions([{ value: '', label: 'Tüm Ajanlar' }]);
+      setAgentError(
+        agentsResult.reason instanceof Error
+          ? agentsResult.reason.message
+          : 'Ajan listesi yüklenemedi',
+      );
+    }
+
+    if (categoriesResult.status === 'fulfilled') {
+      setCategoryError('');
+      setCategoryOptions([
+        { value: '', label: 'Tüm Kategoriler' },
+        ...categoriesResult.value.map((category) => ({ value: category, label: category })),
+      ]);
+    } else {
+      setCategoryOptions([{ value: '', label: 'Tüm Kategoriler' }]);
+      setCategoryError(
+        categoriesResult.reason instanceof Error
+          ? categoriesResult.reason.message
+          : 'Kategori listesi yüklenemedi',
+      );
+    }
+  }, [isAgent]);
 
   useEffect(() => {
-    if (isAgent) {
-      Promise.all([getDashboard(), getAgents()])
-        .then(([dashboard, agents]) => {
-          setStats(dashboard);
-          const agentList = agents as Agent[];
-          setAgentOptions([
-            { value: '', label: 'Tümü' },
-            ...agentList.map((a) => ({ value: a.id, label: a.name })),
-          ]);
-          setAgentMap(Object.fromEntries(agentList.map((a) => [a.id, a.name])));
-        })
-        .catch(() => {});
+    void loadFilterOptions();
+  }, [loadFilterOptions]);
 
-      if (userRole === 'admin') {
-        getRules()
-          .then((response) => setRules((response as { rules: Rule[] }).rules))
-          .catch(() => {});
-      } else {
-        setRules([]);
-      }
+  useEffect(() => {
+    if (
+      userRole === 'agent'
+      && !searchParams.has('queue')
+      && [...searchParams.keys()].length === 0
+    ) {
+      updateUrl({ queue: 'my' }, true);
     }
-    load();
-  }, [load, isAgent, userRole]);
+  }, [searchParams, updateUrl, userRole]);
+
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
+  useEffect(() => {
+    if (searchInput.trim() === search) return undefined;
+    const timeoutId = window.setTimeout(() => {
+      updateUrl({ q: searchInput.trim() || null, page: null }, true);
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [search, searchInput, updateUrl]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   useEffect(() => {
     setSelectedTicketIds([]);
     setBulkResult(null);
-  }, [page, limit, queueFilter, statusFilter, priorityFilter, agentFilter, search]);
+  }, [
+    page,
+    limit,
+    queueFilter,
+    statusFilter,
+    priorityFilter,
+    categoryFilter,
+    agentFilter,
+    search,
+  ]);
 
   function handleSearch() {
-    setPage(1);
+    updateUrl({ q: searchInput.trim() || null, page: null });
   }
 
-  function handleFilterChange() {
-    setPage(1);
+  function handleFilterChange(key: string, value: string) {
+    updateUrl({ [key]: value || null, page: null });
   }
 
   function handleQueueChange(queue: TicketQueue | '') {
-    setQueueFilter(queue);
-    setAgentFilter('');
-    setPage(1);
+    updateUrl({
+      queue: queue || null,
+      agent: queue === 'my' || queue === 'unassigned' ? null : agentFilter || null,
+      page: null,
+    });
   }
 
   function handleAgentFilterChange(agentId: string) {
-    setAgentFilter(agentId);
-    setQueueFilter('');
-    setPage(1);
+    updateUrl({
+      agent: agentId || null,
+      queue: queueFilter === 'my' || queueFilter === 'unassigned' ? null : queueFilter || null,
+      page: null,
+    });
   }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    setCreateError('');
     try {
       const createdTicket = await createTicket({ title: newTitle, description: newDesc, priority: newPrio as Priority });
       setShowCreate(false);
@@ -158,14 +268,18 @@ function TicketList() {
       setNewPrio('normal');
       navigate(`/tickets/${createdTicket.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Hata');
+      setCreateError(err instanceof Error ? err.message : 'Ticket oluşturulamadı');
     }
   }
 
   async function handleClaim(id: string) {
-    await claimTicket(id);
-    load();
-    if (isAgent) getDashboard().then((s) => setStats(s as DashboardStats)).catch(() => {});
+    setListError('');
+    try {
+      await claimTicket(id);
+      await load();
+    } catch (err) {
+      setListError(err instanceof Error ? err.message : 'Ticket üstlenilemedi');
+    }
   }
 
   function toggleTicketSelection(ticketId: string) {
@@ -237,7 +351,7 @@ function TicketList() {
         operation = {
           type: 'assign',
           agentId: userRole === 'agent'
-            ? (user as { id?: string }).id || null
+            ? user?.id || null
             : bulkAgentId === 'unassigned' ? null : bulkAgentId,
         };
       }
@@ -250,9 +364,6 @@ function TicketList() {
       if (result.failed.length === 0) {
         setBulkReason('');
         setBulkPendingUntil('');
-      }
-      if (isAgent) {
-        getDashboard().then((dashboard) => setStats(dashboard as DashboardStats)).catch(() => {});
       }
     } catch (err) {
       setBulkError(err instanceof Error ? err.message : 'Toplu işlem tamamlanamadı');
@@ -312,10 +423,10 @@ function TicketList() {
   const queueOptions: Array<{ value: TicketQueue | ''; label: string; count?: number }> = [
     { value: '', label: 'Tüm Ticketlar' },
     ...(userRole === 'agent'
-      ? [{ value: 'my' as const, label: 'My Tickets', count: stats?.queueCounts.myTickets }]
+      ? [{ value: 'my' as const, label: 'Ticketlarım' }]
       : []),
-    { value: 'unassigned', label: 'Unassigned & Open', count: stats?.queueCounts.unassignedOpen },
-    { value: 'escalated', label: 'Escalated', count: stats?.queueCounts.escalated },
+    { value: 'unassigned', label: 'Atanmamış ve Açık' },
+    { value: 'escalated', label: 'Eskalasyondakiler' },
   ];
 
   const allCurrentPageSelected = tickets.length > 0
@@ -331,56 +442,9 @@ function TicketList() {
 
   return (
     <div>
-      {isAgent && stats && (
-        <div className={styles.dashboardGrid}>
-          <Card title={`Aktif Durum Dağılımı (${stats.activeTotal})`}>
-            {(['new', 'open', 'pending'] as const).map((k) => (
-              <div key={k} className={styles.statRow}>
-                <span>{statusLabels[k]}</span>
-                <strong>{stats.statusBreakdown[k] || 0}</strong>
-              </div>
-            ))}
-          </Card>
-          <Card title="Aktif Ticket Öncelikleri">
-            {(['urgent', 'high', 'normal', 'low'] as const).map((k) => (
-              <div key={k} className={styles.statRow}>
-                <PriorityBadge priority={k} />
-                <strong>{stats.priorityBreakdown[k] || 0}</strong>
-              </div>
-            ))}
-          </Card>
-          <Card title="Aktif SLA İhlalleri">
-            <p className={styles.slaCount} style={{ color: stats.slaBreached > 0 ? 'var(--danger)' : 'var(--success)' }}>
-              {stats.slaBreached}
-            </p>
-            {stats.slaBreached > 0 && <p className={styles.slaText}>Ticket SLA süresini aştı</p>}
-            <div className={styles.statRow}>
-              <span>İlk yanıt</span>
-              <strong>{stats.slaBreachBreakdown.firstResponse}</strong>
-            </div>
-            <div className={styles.statRow}>
-              <span>Çözüm</span>
-              <strong>{stats.slaBreachBreakdown.resolution}</strong>
-            </div>
-          </Card>
-          <Card title="Ajan İş Yükü">
-            {Object.entries(stats.agentWorkload).length === 0 ? (
-              <p className={styles.slaText}>Ajan bulunamadı</p>
-            ) : (
-              Object.entries(stats.agentWorkload).map(([k, v]) => (
-                <div key={k} className={styles.statRow}>
-                  <span>{agentMap[k] || 'Bilinmeyen Ajan'}</span>
-                  <strong>{v} ticket</strong>
-                </div>
-              ))
-            )}
-          </Card>
-        </div>
-      )}
-
       <div className={styles.headerRow}>
         <h2 className={styles.headerTitle}>Ticket Listesi</h2>
-        {(user as { role?: string }).role === 'customer' && (
+        {userRole === 'customer' && (
           <Button onClick={() => setShowCreate(!showCreate)} variant={showCreate ? 'secondary' : 'primary'}>
             {showCreate ? 'İptal' : 'Yeni Ticket'}
           </Button>
@@ -396,8 +460,8 @@ function TicketList() {
               { value: 'low', label: 'Düşük' }, { value: 'normal', label: 'Normal' },
               { value: 'high', label: 'Yüksek' }, { value: 'urgent', label: 'Acil' },
             ]} />
-            {error && <p className={styles.errorText}>{error}</p>}
-            <Button type="submit" style={{ marginTop: 8 }}>Oluştur</Button>
+            {createError && <ErrorBanner message={createError} />}
+            <Button type="submit" className={styles.formSubmit}>Oluştur</Button>
           </form>
         </Card>
       )}
@@ -419,19 +483,45 @@ function TicketList() {
       )}
 
       {isAgent && (
+        <>
+          {agentError && (
+            <ErrorBanner
+              message={`Ajan filtresi yüklenemedi: ${agentError}`}
+              onRetry={() => void loadFilterOptions()}
+            />
+          )}
+          {categoryError && (
+            <ErrorBanner
+              message={`Kategori filtresi yüklenemedi: ${categoryError}`}
+              onRetry={() => void loadFilterOptions()}
+            />
+          )}
+        </>
+      )}
+
+      {isAgent && (
         <div className={styles.filterRow}>
           <div className={styles.filterSelect}>
-            <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); handleFilterChange(); }} options={statusOptions} />
+            <Select aria-label="Durum filtresi" value={statusFilter} onChange={(e) => handleFilterChange('status', e.target.value)} options={statusOptions} />
           </div>
           <div className={styles.filterSelect}>
-            <Select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); handleFilterChange(); }} options={priorityOptions} />
+            <Select aria-label="Öncelik filtresi" value={priorityFilter} onChange={(e) => handleFilterChange('priority', e.target.value)} options={priorityOptions} />
           </div>
           <div className={styles.filterSelectWide}>
-            <Select value={agentFilter} onChange={(e) => handleAgentFilterChange(e.target.value)} options={agentOptions} />
+            <Select aria-label="Kategori filtresi" value={categoryFilter} onChange={(e) => handleFilterChange('category', e.target.value)} options={categoryOptions} />
+          </div>
+          <div className={styles.filterSelectWide}>
+            <Select aria-label="Ajan filtresi" value={agentFilter} onChange={(e) => handleAgentFilterChange(e.target.value)} options={agentOptions} />
           </div>
           <div className={styles.searchGroup}>
             <div className={styles.searchInput}>
-              <Input placeholder="Ara..." value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
+              <Input
+                aria-label="Ticket ara"
+                placeholder="Ara..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
             </div>
             <Button variant="secondary" size="sm" onClick={handleSearch}>Ara</Button>
           </div>
@@ -494,7 +584,15 @@ function TicketList() {
         </div>
       )}
 
-      <Pagination page={page} total={total} limit={limit} onChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} />
+      {listError && <ErrorBanner message={listError} onRetry={() => void load()} />}
+
+      <Pagination
+        page={page}
+        total={total}
+        limit={limit}
+        onChange={(nextPage) => updateUrl({ page: nextPage === 1 ? null : String(nextPage) })}
+        onLimitChange={(nextLimit) => updateUrl({ limit: nextLimit === 20 ? null : String(nextLimit), page: null })}
+      />
 
       {loading ? <Loading /> : tickets.length === 0 ? (
         <EmptyState
@@ -503,7 +601,8 @@ function TicketList() {
         />
       ) : (
         <Card>
-          <table className={styles.table}>
+          <div className={styles.tableScroll}>
+            <table className={styles.table}>
             <thead>
               <tr>
                 {isAgent && (
@@ -516,7 +615,14 @@ function TicketList() {
                     />
                   </th>
                 )}
-                <th>No</th><th>Başlık</th><th>Durum</th><th>Öncelik</th><th>Müşteri</th><th>Ajan</th><th>Son Yorum</th><th></th>
+                <th>No</th>
+                <th>Başlık</th>
+                <th>Durum</th>
+                <th>Öncelik</th>
+                <th className={styles.hideTablet}>Müşteri</th>
+                <th className={styles.hideMobile}>Ajan</th>
+                <th className={styles.hideTablet}>Son Yorum</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -546,24 +652,31 @@ function TicketList() {
                   <td className={styles.cellTitle}>{t.title}</td>
                   <td><StatusBadge status={t.status} /></td>
                   <td><PriorityBadge priority={t.priority} /></td>
-                  <td>{t.customer?.name}</td>
-                  <td>{t.assignedTo?.name || '-'}</td>
-                  <td className={styles.cellLastComment}>
+                  <td className={styles.hideTablet}>{t.customer?.name}</td>
+                  <td className={styles.hideMobile}>{t.assignedTo?.name || '-'}</td>
+                  <td className={`${styles.cellLastComment} ${styles.hideTablet}`}>
                     {t.lastComment ? `${t.lastComment.author.name}: ${t.lastComment.body}` : '-'}
                   </td>
                   <td>
-                    {(user as { role?: string }).role === 'agent' && !t.assignedTo && t.status !== 'closed' && (
+                    {userRole === 'agent' && !t.assignedTo && t.status !== 'closed' && (
                       <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handleClaim(t.id); }}>Üstlen</Button>
                     )}
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         </Card>
       )}
 
-      <Pagination page={page} total={total} limit={limit} onChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} />
+      <Pagination
+        page={page}
+        total={total}
+        limit={limit}
+        onChange={(nextPage) => updateUrl({ page: nextPage === 1 ? null : String(nextPage) })}
+        onLimitChange={(nextLimit) => updateUrl({ limit: nextLimit === 20 ? null : String(nextLimit), page: null })}
+      />
 
       <Modal open={showBulkConfirm} onClose={() => setShowBulkConfirm(false)} title="Toplu İşlemi Onayla">
         <p className={styles.bulkConfirmText}>
@@ -578,26 +691,6 @@ function TicketList() {
         {bulkError && <p className={styles.errorText}>{bulkError}</p>}
       </Modal>
 
-      {isAgent && rules.length > 0 && (user as { role?: string }).role === 'admin' && (
-        <Card title="İşletim Kuralları" style={{ marginTop: 24 }}>
-          <table className={styles.rulesTable}>
-            <thead>
-              <tr>
-                <th>Kural</th>
-                <th>Değer</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rules.map((r, i) => (
-                <tr key={i}>
-                  <td>{r.kural}</td>
-                  <td><strong>{r.deger}</strong></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
     </div>
   );
 }

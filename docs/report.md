@@ -127,11 +127,12 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | İstek | Uygulama |
 |-------|----------|
 | Filtreler (durum/öncelik/atanan/kategori) | `listTickets()` → opsiyonel WHERE parametreleri |
-| Arama | `title` + `description` `contains` |
-| Sayfalama | `skip/take`, parametrik `page` + `limit` |
+| Arama | `title` + `description` `contains`; frontend'de 350 ms debounce |
+| Sayfalama | `skip/take`, parametrik `page` + `limit`; filtrelerle birlikte URL'de saklanır |
 | Son yorum önizlemesi | Ayrı `findMany` + `distinct['ticketId']` ile |
-| Dashboard (durum/öncelik/SLA/agent iş yükü) | `getDashboardStats()` → yalnızca `new`, `open`, `pending` kapsamlı paralel aggregate sorguları |
+| Dashboard (durum/öncelik/SLA/agent iş yükü) | Ayrı `/dashboard` sayfası; `getDashboardStats()` yalnızca `new`, `open`, `pending` kapsamlı paralel aggregate sorguları çalıştırır |
 | Destek kuyrukları | `My Tickets` (agent), `Unassigned & Open` ve `Escalated` (agent/admin); mevcut filtre ve sayfalama ile birleşir |
+| Responsive ve erişilebilirlik | Mobil tablo kapsayıcısı, responsive filtre/navigasyon; modallarda focus trap, Escape ve odağa dönüş |
 | Akıcı çalışma (100k) | P95: list 6ms, dashboard 65ms |
 
 ### FR-08 — İşletim Kuralları Ekranı
@@ -141,7 +142,7 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Admin görüntüleyebilir | `GET /api/rules` → requireRole(['admin']) |
 | Düzenleme gerekmez | Sabit `OPERATING_RULES` array |
 | 4 kural | auto-close 5gün, high 4s, mesai 09-18, webhook retry 24s |
-| Frontend | TicketList sayfası altına entegre edildi |
+| Frontend | Yalnızca adminin erişebildiği ayrı `/rules` sayfası |
 
 ### FR-09 — Türkçe Arayüz
 
@@ -184,7 +185,7 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 
 | İstek | Durum |
 |-------|-------|
-| TypeScript strict: true | ✅ `tsconfig.json`'da tanımlı |
+| TypeScript strict: true | ✅ Backend `tsconfig.json`, frontend `tsconfig.frontend.json`; `npm run build` ikisini de doğrular |
 | any kullanımı gerekçelendirilmeli | ✅ Minimal, tip dönüşümleri `as` ile |
 | Birim testleri | ✅ **108 test** (SLA ihlal türleri, yanıtsız çözüm, dashboard/kuyruklar, activity/audit, bulk işlemler, yaşam döngüsü, state machine, numbering, kategori, webhook, visibility) |
 | Lint temiz | ✅ `npm run lint` 0 hata |

@@ -67,6 +67,7 @@ export interface Ticket {
   description: string;
   status: Status;
   priority: Priority;
+  category: string | null;
   customer: { id: string; name: string; email: string };
   assignedTo: { id: string; name: string } | null;
   comments: Comment[];
@@ -121,6 +122,11 @@ export interface Agent {
   id: string;
   name: string;
   email: string;
+}
+
+export interface OperatingRule {
+  kural: string;
+  deger: string;
 }
 
 export const STATUS_LABELS: Record<Status, string> = {

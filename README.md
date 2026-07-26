@@ -100,6 +100,7 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 | `npm run dev:frontend` | Sadece frontend (Vite) |
 | `npm run dev:mock` | Sadece mock mail kanalı |
 | `npm run build` | Production build |
+| `npm run typecheck:frontend` | Frontend strict TypeScript kontrolü |
 | `npm run lint` | ESLint kontrolü |
 | `npm test` | Birim testleri (Vitest) |
 | `npm run perf` | Performans testi |
@@ -116,6 +117,7 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 ### Tickets
 - `POST /api/tickets` — Ticket oluştur (müşteri)
 - `GET /api/tickets` — Ticket listesi (agent/admin için tenant geneli, müşteri için yalnızca kendi ticket'ları; filtreli + sayfalı). Destek ekibi `queue=my|unassigned|escalated` parametresiyle aktif iş kuyruklarını açabilir; `my` yalnızca agent rolünde kullanılabilir.
+- `GET /api/ticket-categories` — Tenant'ta kullanılan ticket kategorileri
 - `GET /api/tickets/:id` — Ticket detayı
 - `GET /api/tickets/:id/activities` — Sayfalı ticket aktivite geçmişi (müşteri için yalnızca public kayıtlar)
 - `POST /api/tickets/bulk` — En fazla 100 seçili ticket üzerinde durum, öncelik veya ajan işlemi (agent/admin)
@@ -140,6 +142,16 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 - `POST /api/webhook/inbound-email` — Webhook (mock mail, `x-webhook-secret` header gerekli). Bozuk payload'lar ham içerik ve doğrulama hatasıyla kaydedilir; ticket prefix'i tenant ile doğrulanır.
 
 Webhook işlemleri `InboundMessage` üzerinde `processing`, `processed` ve `failed` durumlarıyla izlenir. Ticket/yorum oluşturma ile mesajın tamamlanması aynı transaction içinde yapılır. Yarım kalan `processing` kaydı, 24 saatlik retry penceresi içinde 5 dakikalık sahiplik süresi dolduktan sonra aynı `messageId` ile güvenli biçimde yeniden denenebilir.
+
+## Frontend Yapısı
+
+- Dashboard, ticket listesi ve admin işletim kuralları ayrı sayfalardır.
+- Ticket listesi filtreleri, arama, kuyruk ve sayfalama URL parametrelerinde tutulur; görünüm yenilenebilir ve paylaşılabilir.
+- Arama isteği 350 ms debounce ile gönderilir.
+- Mobil görünümde navigasyon, filtreler, tablolar ve modallar responsive çalışır.
+- Modallar Escape ile kapanır, odağı içeride tutar ve kapanınca önceki odağa döner.
+- API yükleme hataları ilgili bölümde görünür ve tekrar deneme seçeneği sunar.
+- Production build, backend kontrolüne ek olarak ayrı frontend strict TypeScript kontrolünü de çalıştırır.
 
 ## Seed Verisi
 
