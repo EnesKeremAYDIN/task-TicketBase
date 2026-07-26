@@ -36,6 +36,22 @@
 .actionBar {
   display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; align-items: center;
 }
+.macroControl {
+  display: flex; align-items: center; gap: 6px;
+}
+.macroControl > div {
+  min-width: 190px;
+}
+.macroTitle {
+  margin-bottom: 8px;
+}
+.macroSummary {
+  margin: 12px 0 12px 20px; color: var(--text-secondary); font-size: 0.88rem;
+}
+.macroWarning {
+  padding: 10px; border-radius: var(--radius-md); background: var(--bg);
+  color: var(--text-secondary); font-size: 0.8rem;
+}
 .actionError {
   color: var(--danger); font-size: 0.85rem;
 }
@@ -131,6 +147,16 @@
   .actionBar > button,
   .formActions > button {
     flex: 1 1 100%;
+  }
+
+  .macroControl {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .macroControl > div {
+    width: 100%;
   }
 
   .commentHeader {

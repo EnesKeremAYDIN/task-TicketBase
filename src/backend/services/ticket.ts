@@ -268,7 +268,27 @@ export async function updateTicketStatus(
   actorRole: TicketRole,
   options: StatusUpdateOptions = {},
 ) {
-  const ticket = await prisma.ticket.findFirst({
+  return prisma.$transaction((tx) => updateTicketStatusInTransaction(
+    tx,
+    ticketId,
+    tenantId,
+    newStatus,
+    actorId,
+    actorRole,
+    options,
+  ));
+}
+
+export async function updateTicketStatusInTransaction(
+  tx: Prisma.TransactionClient,
+  ticketId: string,
+  tenantId: string,
+  newStatus: string,
+  actorId: string,
+  actorRole: TicketRole,
+  options: StatusUpdateOptions = {},
+) {
+  const ticket = await tx.ticket.findFirst({
     where: { id: ticketId, ...tenantFilter(tenantId) },
   });
 
@@ -332,7 +352,7 @@ export async function updateTicketStatus(
   }
 
   if (newStatus === 'open' && ['resolved', 'closed'].includes(ticket.status)) {
-    const deadlines = await calculateTenantSLADeadlineValues(tenantId, ticket.priority, now);
+    const deadlines = await calculateTenantSLADeadlineValues(tenantId, ticket.priority, now, tx);
     if (deadlines) {
       updateData.slaDueAt = deadlines.slaDueAt;
       updateData.resolutionSlaBreached = false;
@@ -340,47 +360,43 @@ export async function updateTicketStatus(
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    const result = await tx.ticket.updateMany({
-      where: { id: ticketId, tenantId, status: ticket.status },
-      data: updateData,
-    });
-
-    if (result.count === 0) {
-      throw new ValidationError('Ticket durumu değişti, işlem tekrar denenmeli');
-    }
-
-    await recordTicketActivity(tx, {
-      tenantId,
-      ticketId,
-      actorId,
-      type: 'status_changed',
-      field: 'status',
-      oldValue: ticket.status,
-      newValue: newStatus,
-      reason: options.reason || (newStatus === 'pending' ? options.pendingReason : undefined),
-      source: options.source || 'web',
-      visibility: 'public',
-      createdAt: now,
-    });
-
-    if (options.reason?.trim() && isCustomerRejection) {
-      await tx.comment.create({
-        data: {
-          ticketId,
-          authorId: actorId,
-          type: 'public_reply',
-          body: options.reason.trim(),
-        },
-      });
-    }
+  const result = await tx.ticket.updateMany({
+    where: { id: ticketId, tenantId, status: ticket.status },
+    data: updateData,
   });
 
-  const updated = await prisma.ticket.findFirst({
+  if (result.count === 0) {
+    throw new ValidationError('Ticket durumu değişti, işlem tekrar denenmeli');
+  }
+
+  await recordTicketActivity(tx, {
+    tenantId,
+    ticketId,
+    actorId,
+    type: 'status_changed',
+    field: 'status',
+    oldValue: ticket.status,
+    newValue: newStatus,
+    reason: options.reason || (newStatus === 'pending' ? options.pendingReason : undefined),
+    source: options.source || 'web',
+    visibility: 'public',
+    createdAt: now,
+  });
+
+  if (options.reason?.trim() && isCustomerRejection) {
+    await tx.comment.create({
+      data: {
+        ticketId,
+        authorId: actorId,
+        type: 'public_reply',
+        body: options.reason.trim(),
+      },
+    });
+  }
+
+  return tx.ticket.findFirst({
     where: { id: ticketId, ...tenantFilter(tenantId) },
   });
-
-  return updated;
 }
 
 export async function confirmResolution(ticketId: string, tenantId: string, customerId: string) {

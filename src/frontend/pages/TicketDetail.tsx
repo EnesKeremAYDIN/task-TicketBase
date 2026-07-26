@@ -11,6 +11,9 @@ import {
   getComments,
   getTicketActivities,
   createComment,
+  getCannedResponses,
+  getTicketMacros,
+  applyTicketMacro,
 } from '../lib/api';
 import { getAgents } from '../lib/api';
 import {
@@ -22,6 +25,8 @@ import {
   type Agent,
   type Priority,
   type Status,
+  type CannedResponse,
+  type TicketMacro,
 } from '../lib/types';
 import Card from '../components/Card/Card';
 import StatusBadge from '../components/StatusBadge/StatusBadge';
@@ -32,6 +37,9 @@ import Input from '../components/Input/Input';
 import Select from '../components/Select/Select';
 import Modal from '../components/Modal/Modal';
 import Loading from '../components/Loading/Loading';
+import ErrorBanner from '../components/ErrorBanner/ErrorBanner';
+import { getStoredUser } from '../lib/auth-user';
+import { macroActionLabel, renderCannedTemplate } from '../lib/automation';
 import styles from './TicketDetail.module.css';
 
 function TicketDetail() {
@@ -59,17 +67,17 @@ function TicketDetail() {
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [agentLoadError, setAgentLoadError] = useState('');
+  const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([]);
+  const [macros, setMacros] = useState<TicketMacro[]>([]);
+  const [selectedMacroId, setSelectedMacroId] = useState('');
+  const [showMacroConfirm, setShowMacroConfirm] = useState(false);
+  const [macroLoading, setMacroLoading] = useState(false);
+  const [automationError, setAutomationError] = useState('');
 
-  let user = {};
-  try {
-    const raw = localStorage.getItem('user');
-    if (raw) user = JSON.parse(raw);
-  } catch {
-    user = {};
-  }
-  const isAgent = (user as { role?: string }).role === 'agent' || (user as { role?: string }).role === 'admin';
-  const isAdmin = (user as { role?: string }).role === 'admin';
-  const isCustomer = (user as { role?: string }).role === 'customer';
+  const user = getStoredUser();
+  const isAgent = user?.role === 'agent' || user?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
+  const isCustomer = user?.role === 'customer';
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -109,6 +117,35 @@ function TicketDetail() {
         .finally(() => setAgentsLoading(false));
     }
   }, [isAdmin]);
+
+  const loadAutomations = useCallback(async () => {
+    if (!isAgent) return;
+    setAutomationError('');
+    const [responseResult, macroResult] = await Promise.allSettled([
+      getCannedResponses(),
+      getTicketMacros(),
+    ]);
+    if (responseResult.status === 'fulfilled') {
+      setCannedResponses(responseResult.value);
+    } else {
+      setCannedResponses([]);
+      setAutomationError(responseResult.reason instanceof Error
+        ? responseResult.reason.message
+        : 'Hazır yanıtlar yüklenemedi');
+    }
+    if (macroResult.status === 'fulfilled') {
+      setMacros(macroResult.value);
+    } else {
+      setMacros([]);
+      setAutomationError((current) => current || (
+        macroResult.reason instanceof Error ? macroResult.reason.message : 'Makrolar yüklenemedi'
+      ));
+    }
+  }, [isAgent]);
+
+  useEffect(() => {
+    void loadAutomations();
+  }, [loadAutomations]);
 
   if (error) {
     return (
@@ -244,6 +281,29 @@ function TicketDetail() {
     }
   }
 
+  function handleCannedResponse(responseId: string) {
+    const response = cannedResponses.find((item) => item.id === responseId);
+    if (!response || !ticket) return;
+    setCommentType(response.commentType);
+    setNewComment(renderCannedTemplate(response.body, ticket, user));
+  }
+
+  async function handleApplyMacro() {
+    if (!id || !selectedMacroId) return;
+    setMacroLoading(true);
+    setActionError('');
+    try {
+      await applyTicketMacro(id, selectedMacroId);
+      setShowMacroConfirm(false);
+      setSelectedMacroId('');
+      await load();
+    } catch (macroError) {
+      setActionError(macroError instanceof Error ? macroError.message : 'Makro uygulanamadı');
+    } finally {
+      setMacroLoading(false);
+    }
+  }
+
   async function loadMoreActivities() {
     if (!id || activityLoading || activities.length >= activityTotal) return;
     setActivityLoading(true);
@@ -287,6 +347,9 @@ function TicketDetail() {
     if (activity.type === 'assignee_changed') {
       return `${actor} atamayı "${oldValue}" değerinden "${newValue}" değerine değiştirdi.`;
     }
+    if (activity.type === 'macro_applied') {
+      return `${actor} "${activity.newLabel || 'Makro'}" makrosunu uyguladı.`;
+    }
     return `${actor}, ${activity.newLabel || 'yeni'} takip ticket'ını oluşturdu.`;
   }
 
@@ -295,6 +358,7 @@ function TicketDetail() {
       web: 'Web',
       email: 'E-posta',
       bulk: 'Toplu İşlem',
+      macro: 'Makro',
       system: 'Sistem',
       seed: 'Demo Verisi',
     }[source];
@@ -303,6 +367,7 @@ function TicketDetail() {
   const statusActions = ticket.allowedActions.filter((action) => (
     ['new', 'open', 'pending', 'resolved', 'closed'].includes(action)
   ));
+  const selectedMacro = macros.find((macro) => macro.id === selectedMacroId);
 
   const statusActionLabel = (status: string) => {
     if (status === 'open') return ticket.status === 'closed' ? 'Yeniden Aç' : 'Aç';
@@ -357,7 +422,7 @@ function TicketDetail() {
               {statusActionLabel(s)}
             </Button>
           ))}
-          {!ticket.assignedTo && (user as { role?: string }).role === 'agent' && (
+          {!ticket.assignedTo && user?.role === 'agent' && (
             <Button variant="secondary" size="sm" onClick={handleClaim}>Üstlen</Button>
           )}
           {isAdmin && (
@@ -365,8 +430,36 @@ function TicketDetail() {
               {ticket.assignedTo ? 'Ajan Değiştir' : 'Ajan Ata'}
             </Button>
           )}
+          {macros.length > 0 && (
+            <div className={styles.macroControl}>
+              <Select
+                aria-label="Makro seç"
+                value={selectedMacroId}
+                onChange={(event) => setSelectedMacroId(event.target.value)}
+                options={[
+                  { value: '', label: 'Makro seçin' },
+                  ...macros.map((macro) => ({ value: macro.id, label: macro.name })),
+                ]}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!selectedMacroId}
+                onClick={() => {
+                  setActionError('');
+                  setShowMacroConfirm(true);
+                }}
+              >
+                Makroyu Uygula
+              </Button>
+            </div>
+          )}
           {actionError && <span className={styles.actionError}>{actionError}</span>}
         </div>
+      )}
+
+      {isAgent && automationError && (
+        <ErrorBanner message={automationError} onRetry={() => void loadAutomations()} />
       )}
 
       <Modal open={showAssign} onClose={() => setShowAssign(false)} title="Ajan Ata">
@@ -393,6 +486,37 @@ function TicketDetail() {
         <Textarea label="Yeniden Açma Nedeni" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} required />
         <Button onClick={handleReopen} disabled={!reopenReason.trim()} style={{ marginTop: 8 }}>Yeniden Aç</Button>
         {actionError && <p className={styles.actionError}>{actionError}</p>}
+      </Modal>
+
+      <Modal
+        open={showMacroConfirm}
+        onClose={() => {
+          setShowMacroConfirm(false);
+          setActionError('');
+        }}
+        title="Makroyu Uygula"
+      >
+        {selectedMacro && (
+          <>
+            <p className={styles.macroTitle}><strong>{selectedMacro.name}</strong></p>
+            {selectedMacro.description && (
+              <p className={styles.lifecycleInfo}>{selectedMacro.description}</p>
+            )}
+            <ul className={styles.macroSummary}>
+              {selectedMacro.actions.map((action) => (
+                <li key={action.type}>{macroActionLabel(action)}</li>
+              ))}
+            </ul>
+            <p className={styles.macroWarning}>
+              Bütün işlemler birlikte uygulanır; bir işlem başarısız olursa hiçbir değişiklik kaydedilmez.
+            </p>
+            {actionError && <ErrorBanner message={actionError} />}
+            <div className={styles.formActions}>
+              <Button variant="secondary" onClick={() => setShowMacroConfirm(false)}>Vazgeç</Button>
+              <Button onClick={handleApplyMacro} loading={macroLoading}>Uygula</Button>
+            </div>
+          </>
+        )}
       </Modal>
 
       {isCustomer && ticket.allowedActions.includes('confirm_resolution') && (
@@ -469,6 +593,20 @@ function TicketDetail() {
 
         {(ticket.status !== 'closed' || isAdmin) && (
           <form onSubmit={handleComment} className={styles.commentForm}>
+            {isAgent && cannedResponses.length > 0 && (
+              <Select
+                label="Hazır Yanıt"
+                value=""
+                onChange={(event) => handleCannedResponse(event.target.value)}
+                options={[
+                  { value: '', label: 'Hazır yanıt seçin' },
+                  ...cannedResponses.map((response) => ({
+                    value: response.id,
+                    label: `${response.name} (${response.commentType === 'public_reply' ? 'Genel' : 'İç Not'})`,
+                  })),
+                ]}
+              />
+            )}
             <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Yorumunuz..." required />
             {isAgent && (
               <Select value={commentType} onChange={(e) => setCommentType(e.target.value)} options={[

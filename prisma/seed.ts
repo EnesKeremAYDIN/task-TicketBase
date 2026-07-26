@@ -62,6 +62,56 @@ const TURKISH_HOLIDAYS_2026 = [
 const CATEGORIES = ['Donanım', 'Yazılım', 'Ağ', 'Erişim', 'E-posta', 'Güvenlik', 'Diğer'] as const;
 type TicketCategory = typeof CATEGORIES[number];
 
+const CANNED_RESPONSES = [
+  {
+    name: 'İnceleme başladı',
+    commentType: 'public_reply',
+    body: 'Merhaba {{customer.name}},\n\n{{ticket.displayId}} numaralı talebiniz incelenmeye alındı. Gelişme olduğunda sizi bilgilendireceğiz.',
+  },
+  {
+    name: 'Ek bilgi talebi',
+    commentType: 'public_reply',
+    body: 'Merhaba {{customer.name}},\n\nİncelemeye devam edebilmemiz için hata ekranı ve sorunun tekrarlandığı saati paylaşabilir misiniz?',
+  },
+  {
+    name: 'İç ekip takibi',
+    commentType: 'internal_note',
+    body: '{{agent.name}} bu ticket için teknik ekip takibi başlattı.',
+  },
+] as const;
+
+const TICKET_MACROS = [
+  {
+    name: 'Ek bilgi bekleniyor',
+    description: 'Müşteriden bilgi ister ve ticketı 48 saat beklemeye alır.',
+    actions: [
+      {
+        type: 'comment',
+        commentType: 'public_reply',
+        body: 'Merhaba {{customer.name}},\n\nİncelemeye devam edebilmemiz için hata ekranı ve sorunun tekrarlandığı saati paylaşabilir misiniz?',
+      },
+      {
+        type: 'status',
+        status: 'pending',
+        reason: 'Müşteriden ek bilgi bekleniyor',
+        pendingOffsetHours: 48,
+      },
+    ],
+  },
+  {
+    name: 'Üstlen ve incelemeye başla',
+    description: 'Ticketı çalıştıran ajana atar ve müşteriyi bilgilendirir.',
+    actions: [
+      { type: 'assign_self' },
+      {
+        type: 'comment',
+        commentType: 'public_reply',
+        body: 'Merhaba {{customer.name}},\n\nTalebinizi ben devraldım. İncelemeye başladım ve en kısa sürede bilgi paylaşacağım.',
+      },
+    ],
+  },
+] as const;
+
 const CATEGORY_SUBJECTS: Record<TicketCategory, readonly string[]> = {
   'Donanım': ['Yazıcı', 'Monitör', 'Klavye', 'Fare', 'Web kamerası', 'Disk', 'RAM', 'Projeksiyon'],
   'Yazılım': ['PowerPoint', 'Excel', 'Teams', 'Zoom', 'Slack', 'Muhasebe uygulaması', 'Tarayıcı'],
@@ -129,6 +179,8 @@ async function validateSeed(): Promise<void> {
     pendingWithoutReminderCount,
     reopenedTicketCount,
     categoryGroups,
+    cannedResponseCount,
+    macroCount,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.ticket.count(),
@@ -164,6 +216,8 @@ async function validateSeed(): Promise<void> {
     prisma.ticket.count({ where: { status: 'pending', pendingUntil: null } }),
     prisma.ticket.count({ where: { reopenCount: { gt: 0 } } }),
     prisma.ticket.groupBy({ by: ['category'] }),
+    prisma.cannedResponse.count(),
+    prisma.ticketMacro.count(),
   ]);
 
   const actualCategories = new Set(categoryGroups.map((group) => group.category));
@@ -184,6 +238,12 @@ async function validateSeed(): Promise<void> {
     pendingWithoutReminderCount === 0 ? null : `${pendingWithoutReminderCount} pending ticket'ın reminder tarihi eksik`,
     reopenedTicketCount > 0 ? null : 'Yeniden açılma geçmişi olan örnek ticket yok',
     missingCategories.length === 0 ? null : `Eksik kategoriler: ${missingCategories.join(', ')}`,
+    cannedResponseCount === TENANTS.length * CANNED_RESPONSES.length
+      ? null
+      : `Hazır yanıt sayısı ${cannedResponseCount}; beklenen ${TENANTS.length * CANNED_RESPONSES.length}`,
+    macroCount === TENANTS.length * TICKET_MACROS.length
+      ? null
+      : `Makro sayısı ${macroCount}; beklenen ${TENANTS.length * TICKET_MACROS.length}`,
   ].filter((error): error is string => error !== null);
 
   if (errors.length > 0) {
@@ -515,6 +575,26 @@ async function main() {
         });
       }
     }
+
+    await prisma.cannedResponse.createMany({
+      data: CANNED_RESPONSES.map((response) => ({
+        tenantId: tenant.id,
+        createdById: admin.id,
+        name: response.name,
+        body: response.body,
+        commentType: response.commentType,
+      })),
+    });
+
+    await prisma.ticketMacro.createMany({
+      data: TICKET_MACROS.map((macro) => ({
+        tenantId: tenant.id,
+        createdById: admin.id,
+        name: macro.name,
+        description: macro.description,
+        actions: JSON.stringify(macro.actions),
+      })),
+    });
 
     const commentCount = COMMENTS_PER_TENANT;
     console.log(`  ${commentCount} yorum oluşturuluyor...`);

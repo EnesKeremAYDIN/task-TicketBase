@@ -34,7 +34,10 @@ function Layout() {
         )}
         <Link to="/tickets" className={`${styles.link} ${isActive('/tickets')}`}>Ticketler</Link>
         {user?.role === 'admin' && (
-          <Link to="/rules" className={`${styles.link} ${isActive('/rules')}`}>İşletim Kuralları</Link>
+          <>
+            <Link to="/automations" className={`${styles.link} ${isActive('/automations')}`}>Operasyon Araçları</Link>
+            <Link to="/rules" className={`${styles.link} ${isActive('/rules')}`}>İşletim Kuralları</Link>
+          </>
         )}
         <div className={styles.spacer} />
         <span className={styles.userInfo}>{user?.name}</span>

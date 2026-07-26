@@ -36,7 +36,8 @@ export type TicketActivityType =
   | 'status_changed'
   | 'priority_changed'
   | 'assignee_changed'
-  | 'follow_up_created';
+  | 'follow_up_created'
+  | 'macro_applied';
 
 export interface TicketActivity {
   id: string;
@@ -47,7 +48,7 @@ export interface TicketActivity {
   oldLabel: string | null;
   newLabel: string | null;
   reason: string | null;
-  source: 'web' | 'email' | 'bulk' | 'system' | 'seed';
+  source: 'web' | 'email' | 'bulk' | 'macro' | 'system' | 'seed';
   visibility: 'public' | 'internal';
   actor: { id: string; name: string; role: string } | null;
   createdAt: string;
@@ -117,6 +118,50 @@ export interface DashboardStats {
 }
 
 export type TicketQueue = 'my' | 'unassigned' | 'escalated';
+
+export interface CannedResponse {
+  id: string;
+  tenantId: string;
+  name: string;
+  body: string;
+  commentType: 'public_reply' | 'internal_note';
+  isActive: boolean;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type MacroAction =
+  | {
+      type: 'comment';
+      commentType: 'public_reply' | 'internal_note';
+      body: string;
+    }
+  | {
+      type: 'status';
+      status: Exclude<Status, 'new'>;
+      reason?: string;
+      pendingOffsetHours?: number;
+    }
+  | {
+      type: 'priority';
+      priority: Priority;
+    }
+  | {
+      type: 'assign_self';
+    };
+
+export interface TicketMacro {
+  id: string;
+  tenantId: string;
+  name: string;
+  description: string | null;
+  actions: MacroAction[];
+  isActive: boolean;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Agent {
   id: string;

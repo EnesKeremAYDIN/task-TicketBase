@@ -138,6 +138,17 @@
 - Türkçe karakterler doğru kullanılmalı (AGENTS.md §9)
 - Seed verisindeki kullanıcı adları ve ticket içerikleri dahil **hiçbir yerde bozuk karakter olmayacak**
 
+### Ürün Geliştirmesi — Hazır Yanıtlar ve Makrolar
+
+- Admin tenant'a özel hazır yanıt ve makro tanımlarını oluşturabilir, düzenleyebilir ve pasife alabilir
+- Agent/admin yalnızca kendi tenant'ındaki aktif tanımları kullanabilir; müşteri bu yapılara erişemez
+- Hazır yanıt, yorum alanını doldurur ve gönderilmeden önce düzenlenebilir
+- Güvenli şablon değişkenleri: `customer.name`, `ticket.displayId`, `ticket.title`, `agent.name`
+- Makro; yorum, durum, öncelik ve çalıştıran ajana atama işlemlerinden en fazla birer tane içerebilir
+- Makro tek transaction içinde uygulanır; herhangi bir aksiyon başarısız olursa bütün değişiklikler geri alınır
+- Makro normal state machine, SLA, kapalı ticket, rol ve tenant kurallarını atlayamaz
+- Uygulanan makro ve alt işlemleri activity/audit geçmişinde `macro` kaynağıyla izlenir
+
 ---
 
 ## 5. Fonksiyonel Olmayan Gereksinimler

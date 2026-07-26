@@ -11,6 +11,7 @@ import { commentRoutes } from './routes/comment';
 import { slaRoutes } from './routes/sla';
 import { rulesRoutes } from './routes/rules';
 import { agentRoutes } from './routes/agent';
+import { automationRoutes } from './routes/automation';
 import { AppError } from './lib/errors';
 import { autoCloseResolvedTickets } from './services/sla';
 import { reactivatePendingTickets } from './services/ticket';
@@ -60,6 +61,7 @@ const start = async () => {
   await app.register(slaRoutes);
   await app.register(rulesRoutes);
   await app.register(agentRoutes);
+  await app.register(automationRoutes);
 
   const LIFECYCLE_CHECK_INTERVAL = 60 * 60 * 1000;
   setInterval(async () => {

@@ -160,3 +160,67 @@ export async function getAgents() {
 export async function getTicketCategories() {
   return request<string[]>('/ticket-categories');
 }
+
+export async function getCannedResponses(includeInactive = false) {
+  return request<import('./types').CannedResponse[]>(
+    `/canned-responses${includeInactive ? '?includeInactive=true' : ''}`,
+  );
+}
+
+export async function createCannedResponse(
+  data: Pick<import('./types').CannedResponse, 'name' | 'body' | 'commentType' | 'isActive'>,
+) {
+  return request<import('./types').CannedResponse>('/canned-responses', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateCannedResponse(
+  id: string,
+  data: Partial<Pick<import('./types').CannedResponse, 'name' | 'body' | 'commentType' | 'isActive'>>,
+) {
+  return request<import('./types').CannedResponse>(`/canned-responses/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getTicketMacros(includeInactive = false) {
+  return request<import('./types').TicketMacro[]>(
+    `/macros${includeInactive ? '?includeInactive=true' : ''}`,
+  );
+}
+
+export async function createTicketMacro(data: {
+  name: string;
+  description?: string;
+  actions: import('./types').MacroAction[];
+  isActive: boolean;
+}) {
+  return request<import('./types').TicketMacro>('/macros', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateTicketMacro(
+  id: string,
+  data: Partial<{
+    name: string;
+    description: string;
+    actions: import('./types').MacroAction[];
+    isActive: boolean;
+  }>,
+) {
+  return request<import('./types').TicketMacro>(`/macros/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function applyTicketMacro(ticketId: string, macroId: string) {
+  return request<import('./types').Ticket>(`/tickets/${ticketId}/macros/${macroId}/apply`, {
+    method: 'POST',
+  });
+}

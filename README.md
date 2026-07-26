@@ -139,6 +139,9 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 ### Diğer
 - `GET /api/agents` — Ajan listesi (agent/admin)
 - `GET /api/rules` — İşletim kuralları (admin)
+- `GET/POST/PATCH /api/canned-responses` — Tenant bazlı hazır yanıt listeleme ve admin yönetimi
+- `GET/POST/PATCH /api/macros` — Tenant bazlı makro listeleme ve admin yönetimi
+- `POST /api/tickets/:ticketId/macros/:macroId/apply` — Makroyu ticket üzerinde atomik uygulama (agent/admin)
 - `POST /api/webhook/inbound-email` — Webhook (mock mail, `x-webhook-secret` header gerekli). Bozuk payload'lar ham içerik ve doğrulama hatasıyla kaydedilir; ticket prefix'i tenant ile doğrulanır.
 
 Webhook işlemleri `InboundMessage` üzerinde `processing`, `processed` ve `failed` durumlarıyla izlenir. Ticket/yorum oluşturma ile mesajın tamamlanması aynı transaction içinde yapılır. Yarım kalan `processing` kaydı, 24 saatlik retry penceresi içinde 5 dakikalık sahiplik süresi dolduktan sonra aynı `messageId` ile güvenli biçimde yeniden denenebilir.
@@ -152,6 +155,9 @@ Webhook işlemleri `InboundMessage` üzerinde `processing`, `processed` ve `fail
 - Modallar Escape ile kapanır, odağı içeride tutar ve kapanınca önceki odağa döner.
 - API yükleme hataları ilgili bölümde görünür ve tekrar deneme seçeneği sunar.
 - Production build, backend kontrolüne ek olarak ayrı frontend strict TypeScript kontrolünü de çalıştırır.
+- Admin, `/automations` sayfasından hazır yanıt ve makroları oluşturabilir, düzenleyebilir veya pasife alabilir.
+- Agent hazır yanıtı yorum alanına aktararak göndermeden önce düzenleyebilir.
+- Makrolar yorum, durum, öncelik ve kendime atama işlemlerini tek transaction içinde uygular; başarısızlıkta bütün işlemler geri alınır.
 
 ## Seed Verisi
 
@@ -161,6 +167,7 @@ Webhook işlemleri `InboundMessage` üzerinde `processing`, `processed` ve `fail
 - **400.000 yorum**: Tenant başına 100.000; dağılımı deterministik
 - **341.537 deterministik aktivite**: Oluşturma, durum ve atama olayları ticket başına sorgu olmadan toplu üretilir
 - **7 kategori**: Donanım, Yazılım, Ağ, Erişim, E-posta, Güvenlik, Diğer
+- **12 hazır yanıt ve 8 makro**: Her tenant için 3 hazır yanıt ve 2 operasyon makrosu
 - **Yaşam döngüsü örnekleri**: Pending reminder ve yeniden açılma geçmişi bulunan ticket'lar
 - **SLA deadline'ları**: Veritabanına yazılmadan önce bellekte hesaplanır
 - **SLA ihlal türleri**: İlk yanıt ve çözüm ihlalleri ayrı, toplam ihlal alanıyla uyumlu ve deterministik üretilir
@@ -169,11 +176,11 @@ Webhook işlemleri `InboundMessage` üzerinde `processing`, `processed` ve `fail
 
 ## Test Sonuçları
 
-### Birim Testleri (`npm test`) — 108/108 ✅
+### Birim Testleri (`npm test`) — 116/116 ✅
 
 ```
-Test Files  9 passed (9)
-     Tests  108 passed (108)
+Test Files  10 passed (10)
+     Tests  116 passed (116)
 ```
 
 | Test Dosyası | Test Sayısı | Kapsam |
@@ -187,6 +194,7 @@ Test Files  9 passed (9)
 | queue.test.ts | 9 | Aktif dashboard kapsamı, My Tickets, Unassigned & Open, Escalated, rol yetkileri ve filtre uyumu |
 | inbound-email.test.ts | 11 | Webhook, bozuk payload kaydı, tenant prefix kontrolü, duplicate ve yarım kalan işlem retry akışı |
 | extended.test.ts | 16 | Cross-tenant, race, pagination, SLA boundary, search |
+| automation.test.ts | 8 | Hazır yanıt/makro yetkileri, tenant izolasyonu, şablon güvenliği, atomik uygulama ve rollback |
 
 ### Performans (`npm run perf`)
 ```

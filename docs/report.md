@@ -152,6 +152,18 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Türkçe karakterler | ğ, ü, ş, ı, ö, ç doğru kullanıldı |
 | Seed'de bozuk karakter yok | Tüm kullanıcı adları ve içerikler UTF-8 |
 
+### Ürün Geliştirmesi — Hazır Yanıtlar ve Makrolar
+
+| Özellik | Uygulama |
+|---------|----------|
+| Hazır yanıt yönetimi | Tenant bazlı `CannedResponse`; admin CRUD/pasife alma, agent/admin aktif liste |
+| Güvenli şablonlar | Yalnızca müşteri, ticket ve agent için izinli değişkenler; bilinmeyen değişken 400 |
+| Makro yönetimi | Tenant bazlı `TicketMacro`; doğrulanan yorum, durum, öncelik ve kendime atama aksiyonları |
+| Atomik uygulama | Bütün makro aksiyonları tek Prisma transaction'ında; hata durumunda tam rollback |
+| Kural uyumu | Mevcut state machine, SLA hesaplama, rol ve tenant kontrolleri korunur |
+| Audit | Alt işlemler ve `macro_applied` özeti `source=macro` ile kaydedilir |
+| Frontend | Admin `/automations` yönetimi; ticket detayında hazır yanıt ve onaylı makro uygulama |
+
 ---
 
 ## 5. Fonksiyonel Olmayan Gereksinimler (TicketBase.md §5)
@@ -187,7 +199,7 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 |-------|-------|
 | TypeScript strict: true | ✅ Backend `tsconfig.json`, frontend `tsconfig.frontend.json`; `npm run build` ikisini de doğrular |
 | any kullanımı gerekçelendirilmeli | ✅ Minimal, tip dönüşümleri `as` ile |
-| Birim testleri | ✅ **108 test** (SLA ihlal türleri, yanıtsız çözüm, dashboard/kuyruklar, activity/audit, bulk işlemler, yaşam döngüsü, state machine, numbering, kategori, webhook, visibility) |
+| Birim testleri | ✅ **116 test** (hazır yanıt/makro atomikliği ve izolasyonu, SLA ihlal türleri, dashboard/kuyruklar, activity/audit, bulk işlemler, yaşam döngüsü, state machine, kategori, webhook, visibility) |
 | Lint temiz | ✅ `npm run lint` 0 hata |
 
 ### NFR-05 — Zaman Yönetimi

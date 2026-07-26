@@ -4,6 +4,7 @@ import TicketList from './pages/TicketList';
 import TicketDetail from './pages/TicketDetail';
 import Dashboard from './pages/Dashboard';
 import Rules from './pages/Rules';
+import Automations from './pages/Automations';
 import Layout from './components/Layout/Layout';
 import { getDefaultPath, getStoredUser } from './lib/auth-user';
 
@@ -22,6 +23,7 @@ function App() {
           <Route path="tickets" element={<TicketList />} />
           <Route path="tickets/:id" element={<TicketDetail />} />
           <Route path="rules" element={<Rules />} />
+          <Route path="automations" element={<Automations />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

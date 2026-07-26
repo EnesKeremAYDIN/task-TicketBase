@@ -9,10 +9,11 @@ export const ACTIVITY_TYPES = [
   'priority_changed',
   'assignee_changed',
   'follow_up_created',
+  'macro_applied',
 ] as const;
 
 export type TicketActivityType = typeof ACTIVITY_TYPES[number];
-export type TicketActivitySource = 'web' | 'email' | 'bulk' | 'system' | 'seed';
+export type TicketActivitySource = 'web' | 'email' | 'bulk' | 'macro' | 'system' | 'seed';
 export type TicketActivityVisibility = 'public' | 'internal';
 
 export interface TicketActivityData {

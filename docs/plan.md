@@ -95,6 +95,10 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
 - [x] Responsive navigasyon, filtreler, tablolar ve erişilebilir modal davranışı
 - [x] Yorum görünürlük: müşteri sadece public_reply görür, agent/admin ikisini de görür
 - [x] Tüm UI metinleri Türkçe, Türkçe karakterler doğru kullanılacak
+- [x] Tenant bazlı hazır yanıt yönetimi ve ticket yorum alanı entegrasyonu
+- [x] Yorum, durum, öncelik ve kendime atama aksiyonlu makro yönetimi
+- [x] Makroları tek transaction içinde state machine, SLA ve audit kurallarıyla uygulama
+- [x] Hazır yanıt/makro yetkileri, tenant izolasyonu ve rollback testleri
 
 ---
 
