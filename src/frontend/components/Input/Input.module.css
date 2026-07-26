@@ -2,8 +2,9 @@
 .label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 4px; color: var(--text); }
 .input {
   width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius);
-  font-size: 0.9rem; outline: none; transition: border-color 0.15s;
+  font-size: 0.9rem; outline: none; background: var(--control-bg); color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(0, 168, 232, 0.15); }
+.input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring); }
 .error { border-color: var(--danger); }
 .errorText { color: var(--danger); font-size: 0.8rem; margin-top: 2px; }

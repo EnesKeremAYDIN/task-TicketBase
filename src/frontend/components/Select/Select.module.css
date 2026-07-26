@@ -2,6 +2,6 @@
 .label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 4px; color: var(--text); }
 .select {
   width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius);
-  font-size: 0.9rem; outline: none; background: var(--white); cursor: pointer;
+  font-size: 0.9rem; outline: none; background: var(--control-bg); color: var(--text); cursor: pointer;
 }
-.select:focus { border-color: var(--primary); }
+.select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring); }

@@ -2,10 +2,17 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { getToken, setToken } from '../../lib/api';
 import { useEffect } from 'react';
 import Button from '../Button/Button';
+import ThemeToggle from '../ThemeToggle/ThemeToggle';
 import styles from './Layout.module.css';
 import { getStoredUser } from '../../lib/auth-user';
+import type { ThemePreference } from '../../lib/theme';
 
-function Layout() {
+interface LayoutProps {
+  theme: ThemePreference;
+  onThemeChange: (theme: ThemePreference) => void;
+}
+
+function Layout({ theme, onThemeChange }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const user = getStoredUser();
@@ -40,6 +47,7 @@ function Layout() {
           </>
         )}
         <div className={styles.spacer} />
+        <ThemeToggle value={theme} onChange={onThemeChange} compact />
         <span className={styles.userInfo}>{user?.name}</span>
         <Button variant="ghost" size="sm" onClick={handleLogout}>Çıkış</Button>
       </nav>

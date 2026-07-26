@@ -152,6 +152,16 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Türkçe karakterler | ğ, ü, ş, ı, ö, ç doğru kullanıldı |
 | Seed'de bozuk karakter yok | Tüm kullanıcı adları ve içerikler UTF-8 |
 
+### Ürün Geliştirmesi — Tema Desteği
+
+| Özellik | Uygulama |
+|---------|----------|
+| Tema seçenekleri | Sistem, açık ve koyu |
+| Kalıcılık | Tarayıcı `localStorage`; yenileme, giriş ve çıkış boyunca korunur |
+| İlk yükleme | Kayıtlı tercih React başlamadan uygulanır; sistem seçimi `prefers-color-scheme` izler |
+| Tasarım sistemi | Form, tablo, kart, modal, badge, navigasyon ve durum renkleri semantik CSS değişkenleri kullanır |
+| Erişilebilirlik | Metinli seçim, klavye desteği, görünür focus ve AA temel kontrast kontrolü |
+
 ### Ürün Geliştirmesi — Hazır Yanıtlar ve Makrolar
 
 | Özellik | Uygulama |
@@ -172,8 +182,8 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 
 | İstek | Limit | Gerçek | Durum |
 |-------|-------|--------|-------|
-| Ticket listesi p95 | <300ms | **6ms** | ✅ |
-| Dashboard p95 | <500ms | **65ms** | ✅ |
+| Ticket listesi p95 | <300ms | **8ms** | ✅ |
+| Dashboard p95 | <500ms | **77ms** | ✅ |
 | `npm run perf` script'i | — | Mevcut | ✅ |
 
 ### NFR-02 — Eşzamanlılık
@@ -200,8 +210,8 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | TypeScript strict: true | ✅ Backend `tsconfig.json`, frontend `tsconfig.frontend.json`; `npm run build` ikisini de doğrular |
 | any kullanımı gerekçelendirilmeli | ✅ Minimal, tip dönüşümleri `as` ile |
 | Backend testleri | ✅ **116 test** (hazır yanıt/makro atomikliği ve izolasyonu, SLA ihlal türleri, dashboard/kuyruklar, activity/audit, bulk işlemler, yaşam döngüsü, state machine, kategori, webhook, visibility) |
-| Frontend component testleri | ✅ **6 test** (modal focus/Escape/scroll davranışı ve hata tekrar deneme akışı) |
-| Tarayıcı E2E testleri | ✅ **8/8 Playwright** (rol, customer ticket, admin lifecycle, agent pending/makro, URL filtreleri, debounce ve mobil görünüm) |
+| Frontend component testleri | ✅ **11 test** (modal focus/Escape/scroll, hata tekrar deneme ve tema seçimi/kalıcılığı) |
+| Tarayıcı E2E testleri | ✅ **12/12 Playwright** (rol, customer ticket, admin lifecycle, agent pending/makro, URL filtreleri, tema, debounce ve mobil görünüm) |
 | Lint temiz | ✅ `npm run lint` 0 hata |
 
 ### NFR-05 — Zaman Yönetimi
@@ -242,8 +252,8 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Test | Sonuç |
 |------|-------|
 | `npm run lint` | ✅ **0 hata** |
-| `npm test` | ✅ **122/122 geçti** (116 backend + 6 frontend) |
-| `npm run test:e2e` | ✅ **8/8 geçti** (izole `e2e.db`, Chromium) |
+| `npm test` | ✅ **127/127 geçti** (116 backend + 11 frontend) |
+| `npm run test:e2e` | ✅ **12/12 geçti** (izole `e2e.db`, Chromium) |
 | `npm run race-test` | ✅ 20/20 benzersiz, 1/10 claim |
 | `npm run isolation-test` | ✅ 9/9 sıfır sızıntı |
 | `npm run perf` | ✅ Liste P95: **8ms**, Dashboard P95: **77ms** |

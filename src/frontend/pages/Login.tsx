@@ -6,8 +6,15 @@ import Input from '../components/Input/Input';
 import Card from '../components/Card/Card';
 import styles from './Login.module.css';
 import { getDefaultPath } from '../lib/auth-user';
+import ThemeToggle from '../components/ThemeToggle/ThemeToggle';
+import type { ThemePreference } from '../lib/theme';
 
-function Login() {
+interface LoginProps {
+  theme: ThemePreference;
+  onThemeChange: (theme: ThemePreference) => void;
+}
+
+function Login({ theme, onThemeChange }: LoginProps) {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,17 +37,22 @@ function Login() {
   }
 
   return (
-    <div className={styles.wrapper}>
-      <Card>
-        <h1 className={styles.title}>TicketBase</h1>
-        <p className={styles.subtitle}>Multi-Tenant IT Destek Sistemi</p>
-        {error && <p className={styles.error}>{error}</p>}
-        <form onSubmit={handleSubmit}>
-          <Input label="E-posta" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Input label="Şifre" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <Button type="submit" loading={loading} className={styles.submitBtn}>Giriş Yap</Button>
-        </form>
-      </Card>
+    <div className={styles.page}>
+      <div className={styles.themeBar}>
+        <ThemeToggle value={theme} onChange={onThemeChange} />
+      </div>
+      <div className={styles.wrapper}>
+        <Card>
+          <h1 className={styles.title}>TicketBase</h1>
+          <p className={styles.subtitle}>Multi-Tenant IT Destek Sistemi</p>
+          {error && <p className={styles.error}>{error}</p>}
+          <form onSubmit={handleSubmit}>
+            <Input label="E-posta" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input label="Şifre" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <Button type="submit" loading={loading} className={styles.submitBtn}>Giriş Yap</Button>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 }

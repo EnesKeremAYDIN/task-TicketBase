@@ -1,33 +1,142 @@
 :root {
-  --white: #ffffff;
-  --ink-black: #00171f;
-  --deep-space-blue: #003459;
-  --cerulean: #007ea7;
-  --fresh-sky: #00a8e8;
-  --amber: #f59e0b;
-  --red: #dc2626;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-500: #6b7280;
-  --gray-700: #374151;
-  --gray-900: #111827;
+  color-scheme: light;
 
-  --primary: var(--fresh-sky);
-  --primary-hover: var(--cerulean);
-  --success: var(--cerulean);
-  --warning: var(--amber);
-  --danger: var(--red);
+  --primary: #007ea7;
+  --primary-hover: #00698c;
+  --success: #0f766e;
+  --warning: #b45309;
+  --danger: #b91c1c;
+  --danger-hover: #991b1b;
 
-  --bg: var(--white);
-  --bg-secondary: var(--gray-100);
-  --border: var(--gray-200);
-  --text: var(--ink-black);
-  --text-secondary: var(--gray-500);
+  --page-bg: #f3f4f6;
+  --surface: #ffffff;
+  --surface-secondary: #f3f4f6;
+  --surface-hover: #e5e7eb;
+  --control-bg: #ffffff;
+  --header-bg: #ffffff;
+  --border: #d9dee5;
+  --border-strong: #9ca3af;
+  --text: #00171f;
+  --text-secondary: #5b6472;
+  --heading: #003459;
+  --text-on-accent: #ffffff;
+  --focus-ring: rgba(0, 126, 167, 0.24);
+  --overlay: rgba(0, 23, 31, 0.56);
+  --scrollbar: #c2c9d1;
+  --scrollbar-hover: #8a94a3;
 
+  --badge-blue-bg: #dbeafe;
+  --badge-blue-text: #1d4ed8;
+  --badge-green-bg: #dcfce7;
+  --badge-green-text: #166534;
+  --badge-yellow-bg: #fef3c7;
+  --badge-yellow-text: #854d0e;
+  --badge-gray-bg: #e5e7eb;
+  --badge-gray-text: #374151;
+  --badge-red-bg: #fee2e2;
+  --badge-red-text: #991b1b;
+  --badge-indigo-bg: #e0e7ff;
+  --badge-indigo-text: #3730a3;
+
+  /* Eski bileşen değişkenleri yeni semantik yüzeylere yönlendirilir. */
+  --bg: var(--surface);
+  --bg-secondary: var(--page-bg);
+
+  --radius-sm: 4px;
   --radius: 6px;
+  --radius-md: 6px;
   --radius-lg: 8px;
-  --shadow: 0 1px 3px rgba(0, 23, 31, 0.1);
-  --shadow-md: 0 4px 6px rgba(0, 23, 31, 0.1);
+  --shadow: 0 1px 3px rgba(0, 23, 31, 0.12);
+  --shadow-md: 0 8px 24px rgba(0, 23, 31, 0.18);
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --primary: #38bdf8;
+  --primary-hover: #7dd3fc;
+  --success: #5eead4;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --danger-hover: #fca5a5;
+
+  --page-bg: #07111a;
+  --surface: #0f202d;
+  --surface-secondary: #142936;
+  --surface-hover: #1d3442;
+  --control-bg: #0b1924;
+  --header-bg: #0b1924;
+  --border: #2c4352;
+  --border-strong: #557080;
+  --text: #edf6fa;
+  --text-secondary: #aabcc7;
+  --heading: #e0f2fe;
+  --text-on-accent: #00171f;
+  --focus-ring: rgba(56, 189, 248, 0.28);
+  --overlay: rgba(0, 8, 14, 0.76);
+  --scrollbar: #365160;
+  --scrollbar-hover: #587383;
+
+  --badge-blue-bg: #143a52;
+  --badge-blue-text: #93d8fb;
+  --badge-green-bg: #123d35;
+  --badge-green-text: #80e8ca;
+  --badge-yellow-bg: #493716;
+  --badge-yellow-text: #fbd471;
+  --badge-gray-bg: #263b48;
+  --badge-gray-text: #c5d3da;
+  --badge-red-bg: #4a252b;
+  --badge-red-text: #fca5a5;
+  --badge-indigo-bg: #2c315c;
+  --badge-indigo-text: #c7d2fe;
+
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.32);
+  --shadow-md: 0 12px 30px rgba(0, 0, 0, 0.46);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --primary: #38bdf8;
+    --primary-hover: #7dd3fc;
+    --success: #5eead4;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --danger-hover: #fca5a5;
+
+    --page-bg: #07111a;
+    --surface: #0f202d;
+    --surface-secondary: #142936;
+    --surface-hover: #1d3442;
+    --control-bg: #0b1924;
+    --header-bg: #0b1924;
+    --border: #2c4352;
+    --border-strong: #557080;
+    --text: #edf6fa;
+    --text-secondary: #aabcc7;
+    --heading: #e0f2fe;
+    --text-on-accent: #00171f;
+    --focus-ring: rgba(56, 189, 248, 0.28);
+    --overlay: rgba(0, 8, 14, 0.76);
+    --scrollbar: #365160;
+    --scrollbar-hover: #587383;
+
+    --badge-blue-bg: #143a52;
+    --badge-blue-text: #93d8fb;
+    --badge-green-bg: #123d35;
+    --badge-green-text: #80e8ca;
+    --badge-yellow-bg: #493716;
+    --badge-yellow-text: #fbd471;
+    --badge-gray-bg: #263b48;
+    --badge-gray-text: #c5d3da;
+    --badge-red-bg: #4a252b;
+    --badge-red-text: #fca5a5;
+    --badge-indigo-bg: #2c315c;
+    --badge-indigo-text: #c7d2fe;
+
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.32);
+    --shadow-md: 0 12px 30px rgba(0, 0, 0, 0.46);
+  }
 }

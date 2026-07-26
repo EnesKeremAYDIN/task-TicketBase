@@ -93,6 +93,7 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
 - [x] Dashboard, ticket listesi ve admin İşletim Kuralları için ayrı sayfa yapısı
 - [x] İşletim Kuralları sayfası (sabit config: 5 gün kapanma, 4 saat high hedefi, 09-18 mesai, 24s webhook retry)
 - [x] Responsive navigasyon, filtreler, tablolar ve erişilebilir modal davranışı
+- [x] Sistem/açık/koyu tema desteği, ilk yükleme koruması ve tarayıcıda kalıcı tercih
 - [x] Yorum görünürlük: müşteri sadece public_reply görür, agent/admin ikisini de görür
 - [x] Tüm UI metinleri Türkçe, Türkçe karakterler doğru kullanılacak
 - [x] Tenant bazlı hazır yanıt yönetimi ve ticket yorum alanı entegrasyonu
@@ -113,9 +114,9 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
   - SLA hesaplama (mesai, tatil, yaz saati)
   - Webhook işleme (doğrulama, duplicate koruma)
   - Yorum görünürlük kuralları
-- [x] React component testleri: modal erişilebilirliği ve hata tekrar deneme akışı
+- [x] React component testleri: modal, hata tekrar deneme ve tema seçimi akışları
 - [x] İzole SQLite veritabanlı Playwright E2E test altyapısı
-- [x] Rol, customer ticket, admin lifecycle, agent workflow, URL filtreleri ve mobil görünüm E2E senaryoları
+- [x] Rol, customer ticket, admin lifecycle, agent workflow, URL filtreleri, tema ve mobil görünüm E2E senaryoları
 
 ---
 

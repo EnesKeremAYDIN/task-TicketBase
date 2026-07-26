@@ -1,8 +1,8 @@
 .nav {
   display: flex; align-items: center; gap: 24px; padding: 0 24px; height: 56px;
-  background: var(--white); border-bottom: 1px solid var(--border);
+  background: var(--header-bg); border-bottom: 1px solid var(--border);
 }
-.brand { font-weight: 700; font-size: 1.1rem; color: var(--deep-space-blue); margin-right: 24px; }
+.brand { font-weight: 700; font-size: 1.1rem; color: var(--heading); margin-right: 24px; }
 .link { color: var(--text-secondary); font-size: 0.9rem; font-weight: 500; padding: 4px 0; }
 .link:hover { color: var(--primary); }
 .activeLink { color: var(--primary); }

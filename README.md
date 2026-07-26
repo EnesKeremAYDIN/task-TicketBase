@@ -159,6 +159,8 @@ Webhook işlemleri `InboundMessage` üzerinde `processing`, `processed` ve `fail
 - Modallar Escape ile kapanır, odağı içeride tutar ve kapanınca önceki odağa döner.
 - API yükleme hataları ilgili bölümde görünür ve tekrar deneme seçeneği sunar.
 - Production build, backend kontrolüne ek olarak ayrı frontend strict TypeScript kontrolünü de çalıştırır.
+- Kullanıcı `Sistem`, `Açık` veya `Koyu` renk temasını seçebilir; tercih yenileme ve oturum işlemlerinde korunur.
+- Sistem teması işletim sistemi tercihini izler ve kayıtlı tema React yüklenmeden önce uygulanır.
 - Admin, `/automations` sayfasından hazır yanıt ve makroları oluşturabilir, düzenleyebilir veya pasife alabilir.
 - Agent hazır yanıtı yorum alanına aktararak göndermeden önce düzenleyebilir.
 - Makrolar yorum, durum, öncelik ve kendime atama işlemlerini tek transaction içinde uygular; başarısızlıkta bütün işlemler geri alınır.
@@ -180,12 +182,12 @@ Webhook işlemleri `InboundMessage` üzerinde `processing`, `processed` ve `fail
 
 ## Test Sonuçları
 
-### Otomatik Testler (`npm test`) — 122/122 ✅
+### Otomatik Testler (`npm test`) — 127/127 ✅
 
 ```
 Backend:   116/116
-Frontend:    6/6
-Toplam:    122/122
+Frontend:   11/11
+Toplam:    127/127
 ```
 
 #### Backend API Testleri
@@ -209,13 +211,15 @@ Toplam:    122/122
 |-------------|-------------|--------|
 | Modal.test.tsx | 4 | Render, Escape, focus trap, önceki odağa dönüş ve scroll kilidi |
 | ErrorBanner.test.tsx | 2 | Alert erişilebilirliği ve tekrar dene aksiyonu |
+| ThemeToggle.test.tsx | 5 | Tema seçenekleri, erişilebilirlik, seçim, kalıcılık ve HTML uygulaması |
 
-### Tarayıcı E2E Testleri (`npm run test:e2e`) — 8/8 ✅
+### Tarayıcı E2E Testleri (`npm run test:e2e`) — 12/12 ✅
 
 Playwright; geliştirme veritabanına dokunmadan `prisma/e2e.db` üzerinde backend `3100`
 ve frontend `5174` portlarını otomatik başlatır. Rol bazlı giriş, customer ticket oluşturma,
 admin kapatma/yeniden açma, agent pending/makro akışı, URL filtreleri, arama debounce ve
-mobil taşma davranışları gerçek Chromium tarayıcısında doğrulanır.
+mobil taşma davranışları gerçek Chromium tarayıcısında doğrulanır. Sistem/açık/koyu tema,
+ilk yükleme, yenileme, giriş/çıkış kalıcılığı ve temel renk kontrastı da E2E kapsamındadır.
 
 İlk kurulumda tarayıcı çalışma ortamı bir kez indirilmelidir:
 
