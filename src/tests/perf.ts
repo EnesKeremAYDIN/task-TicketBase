@@ -41,65 +41,86 @@ function measureP95(times: number[]): number {
   return sorted[idx] || 0;
 }
 
+function assertSuccessfulResponse(
+  label: string,
+  response: { statusCode: number; body: string },
+) {
+  if (response.statusCode !== 200) {
+    const responsePreview = response.body.slice(0, 500);
+    throw new Error(
+      `${label} başarısız oldu: HTTP ${response.statusCode} - ${responsePreview}`,
+    );
+  }
+}
+
 async function main() {
   console.log('Performans testi başlıyor...\n');
 
   const app = await buildApp();
 
-  const loginRes = await app.inject({
-    method: 'POST',
-    url: '/api/auth/login',
-    payload: { email: 'agent1@acme.com', password: '123456' },
-  });
-  const token = JSON.parse(loginRes.body).token;
-
-  const listTimes: number[] = [];
-  const dashboardTimes: number[] = [];
-
-  for (let i = 0; i < 20; i++) {
-    const start = Date.now();
-    await app.inject({
-      method: 'GET',
-      url: '/api/tickets?page=1&limit=20',
-      headers: { authorization: `Bearer ${token}` },
+  try {
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: 'agent1@acme.com', password: '123456' },
     });
-    listTimes.push(Date.now() - start);
+    assertSuccessfulResponse('Performans testi girişi', loginRes);
+
+    const token = (JSON.parse(loginRes.body) as { token?: unknown }).token;
+    if (typeof token !== 'string' || !token) {
+      throw new Error('Performans testi girişi geçerli bir token döndürmedi');
+    }
+
+    const listTimes: number[] = [];
+    const dashboardTimes: number[] = [];
+
+    for (let i = 0; i < 20; i++) {
+      const start = Date.now();
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/tickets?page=1&limit=20',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      assertSuccessfulResponse(`Ticket listesi isteği ${i + 1}`, response);
+      listTimes.push(Date.now() - start);
+    }
+
+    for (let i = 0; i < 10; i++) {
+      const start = Date.now();
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/sla/dashboard',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      assertSuccessfulResponse(`Dashboard isteği ${i + 1}`, response);
+      dashboardTimes.push(Date.now() - start);
+    }
+
+    const listP95 = measureP95(listTimes);
+    const dashboardP95 = measureP95(dashboardTimes);
+
+    const listAvg = listTimes.reduce((a, b) => a + b, 0) / listTimes.length;
+    const dashboardAvg = dashboardTimes.reduce((a, b) => a + b, 0) / dashboardTimes.length;
+
+    console.log('Ticket Listesi:');
+    console.log(`   Ortalama: ${listAvg.toFixed(1)}ms`);
+    console.log(`   P95: ${listP95}ms`);
+    console.log(`   Durum: ${listP95 < 300 ? '✅ BAŞARILI (<300ms)' : '❌ BAŞARISIZ (>=300ms)'}`);
+
+    console.log('\nDashboard:');
+    console.log(`   Ortalama: ${dashboardAvg.toFixed(1)}ms`);
+    console.log(`   P95: ${dashboardP95}ms`);
+    console.log(`   Durum: ${dashboardP95 < 500 ? '✅ BAŞARILI (<500ms)' : '❌ BAŞARISIZ (>=500ms)'}`);
+
+    const success = listP95 < 300 && dashboardP95 < 500;
+    console.log(`\n🏁 Performans testi ${success ? 'BAŞARILI' : 'BAŞARISIZ'}`);
+    if (!success) process.exitCode = 1;
+  } finally {
+    await app.close();
   }
-
-  for (let i = 0; i < 10; i++) {
-    const start = Date.now();
-    await app.inject({
-      method: 'GET',
-      url: '/api/sla/dashboard',
-      headers: { authorization: `Bearer ${token}` },
-    });
-    dashboardTimes.push(Date.now() - start);
-  }
-
-  const listP95 = await measureP95(listTimes);
-  const dashboardP95 = await measureP95(dashboardTimes);
-
-  const listAvg = listTimes.reduce((a, b) => a + b, 0) / listTimes.length;
-  const dashboardAvg = dashboardTimes.reduce((a, b) => a + b, 0) / dashboardTimes.length;
-
-  console.log('Ticket Listesi:');
-  console.log(`   Ortalama: ${listAvg.toFixed(1)}ms`);
-  console.log(`   P95: ${listP95}ms`);
-  console.log(`   Durum: ${listP95 < 300 ? '✅ BAŞARILI (<300ms)' : '❌ BAŞARISIZ (>=300ms)'}`);
-
-  console.log('\nDashboard:');
-  console.log(`   Ortalama: ${dashboardAvg.toFixed(1)}ms`);
-  console.log(`   P95: ${dashboardP95}ms`);
-  console.log(`   Durum: ${dashboardP95 < 500 ? '✅ BAŞARILI (<500ms)' : '❌ BAŞARISIZ (>=500ms)'}`);
-
-  const success = listP95 < 300 && dashboardP95 < 500;
-  console.log(`\n🏁 Performans testi ${success ? 'BAŞARILI' : 'BAŞARISIZ'}`);
-
-  await app.close();
-  process.exit(success ? 0 : 1);
 }
 
 main().catch((e) => {
   console.error('Perf test hatası:', e);
-  process.exit(1);
+  process.exitCode = 1;
 });
