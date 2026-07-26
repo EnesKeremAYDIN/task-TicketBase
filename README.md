@@ -102,7 +102,11 @@ Detaylı müşteri listesi için: [docs/users.md](docs/users.md)
 | `npm run build` | Production build |
 | `npm run typecheck:frontend` | Frontend strict TypeScript kontrolü |
 | `npm run lint` | ESLint kontrolü |
-| `npm test` | Birim testleri (Vitest) |
+| `npm test` | Backend ve frontend component testleri |
+| `npm run test:backend` | Backend API testleri (Vitest) |
+| `npm run test:frontend` | React component testleri (Vitest + Testing Library) |
+| `npm run test:e2e` | İzole veritabanıyla gerçek tarayıcı testleri (Playwright) |
+| `npm run test:all` | Backend, component ve E2E testlerinin tamamı |
 | `npm run perf` | Performans testi |
 | `npm run race-test` | Eşzamanlılık testi |
 | `npm run isolation-test` | Tenant izolasyon testi |
@@ -176,12 +180,15 @@ Webhook işlemleri `InboundMessage` üzerinde `processing`, `processed` ve `fail
 
 ## Test Sonuçları
 
-### Birim Testleri (`npm test`) — 116/116 ✅
+### Otomatik Testler (`npm test`) — 122/122 ✅
 
 ```
-Test Files  10 passed (10)
-     Tests  116 passed (116)
+Backend:   116/116
+Frontend:    6/6
+Toplam:    122/122
 ```
+
+#### Backend API Testleri
 
 | Test Dosyası | Test Sayısı | Kapsam |
 |-------------|-------------|--------|
@@ -196,16 +203,36 @@ Test Files  10 passed (10)
 | extended.test.ts | 16 | Cross-tenant, race, pagination, SLA boundary, search |
 | automation.test.ts | 8 | Hazır yanıt/makro yetkileri, tenant izolasyonu, şablon güvenliği, atomik uygulama ve rollback |
 
+#### Frontend Component Testleri
+
+| Test Dosyası | Test Sayısı | Kapsam |
+|-------------|-------------|--------|
+| Modal.test.tsx | 4 | Render, Escape, focus trap, önceki odağa dönüş ve scroll kilidi |
+| ErrorBanner.test.tsx | 2 | Alert erişilebilirliği ve tekrar dene aksiyonu |
+
+### Tarayıcı E2E Testleri (`npm run test:e2e`) — 8/8 ✅
+
+Playwright; geliştirme veritabanına dokunmadan `prisma/e2e.db` üzerinde backend `3100`
+ve frontend `5174` portlarını otomatik başlatır. Rol bazlı giriş, customer ticket oluşturma,
+admin kapatma/yeniden açma, agent pending/makro akışı, URL filtreleri, arama debounce ve
+mobil taşma davranışları gerçek Chromium tarayıcısında doğrulanır.
+
+İlk kurulumda tarayıcı çalışma ortamı bir kez indirilmelidir:
+
+```bash
+npx playwright install chromium
+```
+
 ### Performans (`npm run perf`)
 ```
 Ticket Listesi:
-   Ortalama: 3.9ms
-   P95: 6ms
+   Ortalama: 5.0ms
+   P95: 8ms
    Durum: ✅ BAŞARILI (<300ms)
 
 Dashboard:
-   Ortalama: 50.7ms
-   P95: 65ms
+   Ortalama: 43.1ms
+   P95: 77ms
    Durum: ✅ BAŞARILI (<500ms)
 ```
 
@@ -245,6 +272,9 @@ Genel: ✅ 9/9 BAŞARILI (sıfır sızıntı)
 | `JWT_SECRET` | `ticketbase-dev-secret-...` | JWT imzalama anahtarı |
 | `WEBHOOK_SECRET` | `ticketbase-webhook-secret` | Webhook doğrulama anahtarı |
 | `PORT` | `3000` | Backend portu |
+| `RATE_LIMIT_MAX` | `100` | Genel API istek limiti (dakika/IP) |
 | `FRONTEND_PORT` | `5173` | Frontend portu |
+| `FRONTEND_HOST` | Vite varsayılanı | Frontend geliştirme sunucusu host adresi |
+| `API_PROXY_TARGET` | `http://localhost:3000` | Frontend `/api` proxy hedefi |
 | `MOCK_MAIL_PORT` | `4000` | Mock mail portu |
 | `BACKEND_URL` | `http://localhost:3000` | Backend adresi (mock mail için) |

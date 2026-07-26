@@ -113,6 +113,9 @@ Verilen spec'te starter repo'dan bahsediliyor ancak teslim edilmedi. Mock mail c
   - SLA hesaplama (mesai, tatil, yaz saati)
   - Webhook işleme (doğrulama, duplicate koruma)
   - Yorum görünürlük kuralları
+- [x] React component testleri: modal erişilebilirliği ve hata tekrar deneme akışı
+- [x] İzole SQLite veritabanlı Playwright E2E test altyapısı
+- [x] Rol, customer ticket, admin lifecycle, agent workflow, URL filtreleri ve mobil görünüm E2E senaryoları
 
 ---
 

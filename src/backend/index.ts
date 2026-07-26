@@ -42,7 +42,7 @@ const start = async () => {
   await app.register(cors);
 
   await app.register(rateLimit, {
-    max: 100,
+    max: Number(process.env.RATE_LIMIT_MAX) || 100,
     timeWindow: '1 minute',
   });
 

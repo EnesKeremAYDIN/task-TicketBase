@@ -133,7 +133,7 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Dashboard (durum/öncelik/SLA/agent iş yükü) | Ayrı `/dashboard` sayfası; `getDashboardStats()` yalnızca `new`, `open`, `pending` kapsamlı paralel aggregate sorguları çalıştırır |
 | Destek kuyrukları | `My Tickets` (agent), `Unassigned & Open` ve `Escalated` (agent/admin); mevcut filtre ve sayfalama ile birleşir |
 | Responsive ve erişilebilirlik | Mobil tablo kapsayıcısı, responsive filtre/navigasyon; modallarda focus trap, Escape ve odağa dönüş |
-| Akıcı çalışma (100k) | P95: list 6ms, dashboard 65ms |
+| Akıcı çalışma (100k) | P95: list 8ms, dashboard 77ms |
 
 ### FR-08 — İşletim Kuralları Ekranı
 
@@ -199,7 +199,9 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 |-------|-------|
 | TypeScript strict: true | ✅ Backend `tsconfig.json`, frontend `tsconfig.frontend.json`; `npm run build` ikisini de doğrular |
 | any kullanımı gerekçelendirilmeli | ✅ Minimal, tip dönüşümleri `as` ile |
-| Birim testleri | ✅ **116 test** (hazır yanıt/makro atomikliği ve izolasyonu, SLA ihlal türleri, dashboard/kuyruklar, activity/audit, bulk işlemler, yaşam döngüsü, state machine, kategori, webhook, visibility) |
+| Backend testleri | ✅ **116 test** (hazır yanıt/makro atomikliği ve izolasyonu, SLA ihlal türleri, dashboard/kuyruklar, activity/audit, bulk işlemler, yaşam döngüsü, state machine, kategori, webhook, visibility) |
+| Frontend component testleri | ✅ **6 test** (modal focus/Escape/scroll davranışı ve hata tekrar deneme akışı) |
+| Tarayıcı E2E testleri | ✅ **8/8 Playwright** (rol, customer ticket, admin lifecycle, agent pending/makro, URL filtreleri, debounce ve mobil görünüm) |
 | Lint temiz | ✅ `npm run lint` 0 hata |
 
 ### NFR-05 — Zaman Yönetimi
@@ -240,10 +242,11 @@ Durumlar: Rol duyarlı `new`, `open`, `pending`, `resolved`, `closed`; kontroll�
 | Test | Sonuç |
 |------|-------|
 | `npm run lint` | ✅ **0 hata** |
-| `npm test` | ✅ **108/108 geçti** (9 dosya) |
+| `npm test` | ✅ **122/122 geçti** (116 backend + 6 frontend) |
+| `npm run test:e2e` | ✅ **8/8 geçti** (izole `e2e.db`, Chromium) |
 | `npm run race-test` | ✅ 20/20 benzersiz, 1/10 claim |
 | `npm run isolation-test` | ✅ 9/9 sıfır sızıntı |
-| `npm run perf` | ✅ Liste P95: **6ms**, Dashboard P95: **65ms** |
+| `npm run perf` | ✅ Liste P95: **8ms**, Dashboard P95: **77ms** |
 
 ---
 

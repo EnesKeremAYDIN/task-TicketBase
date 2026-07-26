@@ -3,3 +3,6 @@ dist/
 .vite/
 *.db
 *.db-journal
+playwright/.auth/
+playwright-report/
+test-results/

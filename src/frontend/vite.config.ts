@@ -11,9 +11,11 @@ export default defineConfig({
   plugins: [react()],
   root: path.resolve(__dirname, '.'),
   server: {
+    host: process.env.FRONTEND_HOST,
     port: Number(process.env.FRONTEND_PORT) || 5173,
+    strictPort: true,
     proxy: {
-      '/api': 'http://localhost:3000',
+      '/api': process.env.API_PROXY_TARGET || 'http://localhost:3000',
     },
   },
   build: {
