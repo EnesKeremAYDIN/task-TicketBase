@@ -30,6 +30,7 @@ import EmptyState from '../components/EmptyState/EmptyState';
 import Modal from '../components/Modal/Modal';
 import ErrorBanner from '../components/ErrorBanner/ErrorBanner';
 import { getStoredUser } from '../lib/auth-user';
+import { parseIstanbulDateTimeInput } from '../lib/date';
 import styles from './TicketList.module.css';
 
 const VALID_QUEUES: TicketQueue[] = ['my', 'unassigned', 'escalated'];
@@ -311,9 +312,9 @@ function TicketList() {
         return;
       }
       if (bulkStatus === 'pending') {
-        const pendingDate = new Date(bulkPendingUntil);
-        if (Number.isNaN(pendingDate.getTime()) || pendingDate <= new Date()) {
-          setBulkError('Pending bitiş tarihi gelecekte olmalıdır.');
+        const pendingDate = parseIstanbulDateTimeInput(bulkPendingUntil);
+        if (!pendingDate || pendingDate <= new Date()) {
+          setBulkError('Pending bitiş tarihi İstanbul saatine göre gelecekte olmalıdır.');
           return;
         }
       }
@@ -334,6 +335,16 @@ function TicketList() {
   async function executeBulkOperation() {
     if (!bulkOperation || selectedTicketIds.length === 0) return;
 
+    let pendingUntilIso: string | undefined;
+    if (bulkOperation === 'status' && bulkStatus === 'pending') {
+      const pendingDate = parseIstanbulDateTimeInput(bulkPendingUntil);
+      if (!pendingDate || pendingDate <= new Date()) {
+        setBulkError('Pending bitiş tarihi İstanbul saatine göre gelecekte olmalıdır.');
+        return;
+      }
+      pendingUntilIso = pendingDate.toISOString();
+    }
+
     setBulkLoading(true);
     setBulkError('');
     try {
@@ -342,7 +353,7 @@ function TicketList() {
         operation = {
           type: 'status',
           status: bulkStatus,
-          pendingUntil: bulkStatus === 'pending' ? new Date(bulkPendingUntil).toISOString() : undefined,
+          pendingUntil: pendingUntilIso,
           reason: bulkReason.trim() || undefined,
         };
       } else if (bulkOperation === 'priority') {

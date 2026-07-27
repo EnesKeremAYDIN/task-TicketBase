@@ -10,7 +10,11 @@ import { commentRoutes } from '../backend/routes/comment';
 import { slaRoutes } from '../backend/routes/sla';
 import { inboundEmailRoutes } from '../backend/routes/inbound-email';
 import { AppError } from '../backend/lib/errors';
-import { addBusinessMinutes, nextBusinessMinute } from '../backend/lib/business-hours';
+import {
+  addBusinessMinutes,
+  getBusinessHoursBetween,
+  nextBusinessMinute,
+} from '../backend/lib/business-hours';
 import { calculateSLADeadlineValues, markBreachedTickets } from '../backend/services/sla';
 import prisma from '../backend/lib/prisma';
 
@@ -84,6 +88,30 @@ describe('Business Hours Calculator', () => {
     expect(result.getUTCDay()).toBe(1);
     expect(result.getUTCDate()).toBe(5);
     expect(result.getUTCHours()).toBe(6);
+  });
+
+  it('UTCde pazar olan İstanbul pazartesi başlangıcını doğru hesaplamalı', () => {
+    const mondayInIstanbul = new Date('2026-01-04T21:30:00.000Z');
+    const result = nextBusinessMinute(mondayInIstanbul, holidays);
+    expect(result).toEqual(new Date('2026-01-05T06:00:00.000Z'));
+  });
+
+  it('18:00 İstanbul mesai bitişini sonraki iş günü 09:00a taşımalı', () => {
+    const mondayAtClosing = new Date('2026-01-05T15:00:00.000Z');
+    const result = nextBusinessMinute(mondayAtClosing, holidays);
+    expect(result).toEqual(new Date('2026-01-06T06:00:00.000Z'));
+  });
+
+  it('İstanbulun tarihsel yaz saati geçişinde IANA offsetini kullanmalı', () => {
+    const fridayAtFive = new Date('2015-03-27T15:00:00.000Z');
+    const result = addBusinessMinutes(fridayAtFive, 4 * 60, []);
+    expect(result).toEqual(new Date('2015-03-30T09:00:00.000Z'));
+  });
+
+  it('iki UTC zamanı arasındaki İstanbul mesai süresini hesaplamalı', () => {
+    const fridayAtFive = new Date('2026-01-02T14:00:00.000Z');
+    const mondayAtNoon = new Date('2026-01-05T09:00:00.000Z');
+    expect(getBusinessHoursBetween(fridayAtFive, mondayAtNoon, holidays)).toBe(4 * 60);
   });
 
   it('SLA tarihlerini veritabanı sorgusu olmadan hesaplamalı', () => {

@@ -1,55 +1,80 @@
-const WORK_START_H = 6;
-const WORK_END_H = 15;
-const TZ_OFFSET = 3;
+import {
+  addLocalCalendarDays,
+  getIstanbulDateTimeParts,
+  istanbulDateTimeToUtc,
+  localDateKey,
+  type LocalDateTimeParts,
+} from '../../shared/time-zone';
 
-function dateOnly(date: Date): number {
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+const WORK_START_HOUR = 9;
+const WORK_END_HOUR = 18;
+
+function holidayKeys(holidays: Date[]): Set<string> {
+  return new Set(holidays.map((holiday) => localDateKey({
+    year: holiday.getUTCFullYear(),
+    month: holiday.getUTCMonth() + 1,
+    day: holiday.getUTCDate(),
+  })));
 }
 
-function isHoliday(date: Date, holidays: Date[]): boolean {
-  const d = dateOnly(date);
-  return holidays.some((h) => dateOnly(h) === d);
-}
-
-function isWeekend(date: Date): boolean {
-  const day = date.getUTCDay();
+function isWeekend(parts: Pick<LocalDateTimeParts, 'year' | 'month' | 'day'>): boolean {
+  const day = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
   return day === 0 || day === 6;
 }
 
-function isBusinessDay(date: Date, holidays: Date[]): boolean {
-  return !isWeekend(date) && !isHoliday(date, holidays);
+function isBusinessDay(
+  parts: Pick<LocalDateTimeParts, 'year' | 'month' | 'day'>,
+  holidays: Set<string>,
+): boolean {
+  return !isWeekend(parts) && !holidays.has(localDateKey(parts));
 }
 
-function istHour(date: Date): number {
-  return (date.getUTCHours() + TZ_OFFSET) % 24;
+function atLocalTime(
+  parts: Pick<LocalDateTimeParts, 'year' | 'month' | 'day'>,
+  hour: number,
+): Date {
+  return istanbulDateTimeToUtc({
+    ...parts,
+    hour,
+    minute: 0,
+    second: 0,
+  });
 }
 
-function isWithinHours(date: Date): boolean {
-  const h = istHour(date);
-  return h >= 9 && h < 18;
+function nextBusinessDayStart(
+  parts: Pick<LocalDateTimeParts, 'year' | 'month' | 'day'>,
+  holidays: Set<string>,
+): Date {
+  let nextDate = addLocalCalendarDays(parts, 1);
+  while (!isBusinessDay(nextDate, holidays)) {
+    nextDate = addLocalCalendarDays(nextDate, 1);
+  }
+  return atLocalTime(nextDate, WORK_START_HOUR);
 }
 
 export function nextBusinessMinute(date: Date, holidays: Date[]): Date {
   let current = new Date(date);
+  const holidaysByDate = holidayKeys(holidays);
   let iterations = 0;
   const MAX_ITERATIONS = 1000;
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
-    if (!isBusinessDay(current, holidays)) {
-      current = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate() + 1, WORK_START_H, 0, 0, 0));
+    const local = getIstanbulDateTimeParts(current);
+    if (!isBusinessDay(local, holidaysByDate)) {
+      let businessDate = { year: local.year, month: local.month, day: local.day };
+      while (!isBusinessDay(businessDate, holidaysByDate)) {
+        businessDate = addLocalCalendarDays(businessDate, 1);
+      }
+      current = atLocalTime(businessDate, WORK_START_HOUR);
       continue;
     }
 
-    if (!isWithinHours(current)) {
-      if (istHour(current) >= 18) {
-        current = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate() + 1, WORK_START_H, 0, 0, 0));
-        continue;
-      }
-      if (istHour(current) < 9) {
-        current = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate(), WORK_START_H, 0, 0, 0));
-        continue;
-      }
+    if (local.hour < WORK_START_HOUR) {
+      return atLocalTime(local, WORK_START_HOUR);
+    }
+    if (local.hour >= WORK_END_HOUR) {
+      return nextBusinessDayStart(local, holidaysByDate);
     }
 
     return current;
@@ -62,9 +87,11 @@ export function addBusinessMinutes(start: Date, minutes: number, holidays: Date[
   if (minutes < 0) throw new Error('Minutes cannot be negative');
   let remaining = minutes;
   let current = nextBusinessMinute(start, holidays);
+  const holidaysByDate = holidayKeys(holidays);
 
   while (remaining > 0) {
-    const dayEnd = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate(), WORK_END_H, 0, 0, 0));
+    const local = getIstanbulDateTimeParts(current);
+    const dayEnd = atLocalTime(local, WORK_END_HOUR);
     const available = Math.floor((dayEnd.getTime() - current.getTime()) / 60000);
 
     if (available >= remaining) {
@@ -72,30 +99,27 @@ export function addBusinessMinutes(start: Date, minutes: number, holidays: Date[
     }
 
     remaining -= available;
-    current = nextBusinessMinute(
-      new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate() + 1, WORK_START_H, 0, 0, 0)),
-      holidays,
-    );
+    current = nextBusinessDayStart(local, holidaysByDate);
   }
 
   return current;
 }
 
 export function getBusinessHoursBetween(start: Date, end: Date, holidays: Date[]): number {
+  if (end <= start) return 0;
+
   let totalMinutes = 0;
   let current = nextBusinessMinute(start, holidays);
 
   while (current < end) {
-    const dayEnd = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate(), WORK_END_H, 0, 0, 0));
+    const local = getIstanbulDateTimeParts(current);
+    const dayEnd = atLocalTime(local, WORK_END_HOUR);
     const segmentEnd = dayEnd < end ? dayEnd : end;
     totalMinutes += (segmentEnd.getTime() - current.getTime()) / 60000;
 
     if (dayEnd >= end) break;
 
-    current = nextBusinessMinute(
-      new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate() + 1, WORK_START_H, 0, 0, 0)),
-      holidays,
-    );
+    current = nextBusinessMinute(dayEnd, holidays);
   }
 
   return totalMinutes;

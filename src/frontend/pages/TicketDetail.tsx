@@ -40,6 +40,11 @@ import Loading from '../components/Loading/Loading';
 import ErrorBanner from '../components/ErrorBanner/ErrorBanner';
 import { getStoredUser } from '../lib/auth-user';
 import { macroActionLabel, renderCannedTemplate } from '../lib/automation';
+import {
+  formatIstanbulDate,
+  formatIstanbulDateTime,
+  parseIstanbulDateTimeInput,
+} from '../lib/date';
 import styles from './TicketDetail.module.css';
 
 function TicketDetail() {
@@ -184,9 +189,14 @@ function TicketDetail() {
   async function handlePending() {
     if (!id || !pendingUntil || !pendingReason.trim()) return;
     setActionError('');
+    const pendingDate = parseIstanbulDateTimeInput(pendingUntil);
+    if (!pendingDate || pendingDate <= new Date()) {
+      setActionError('Bekleme bitiş tarihi İstanbul saatine göre gelecekte olmalıdır.');
+      return;
+    }
     try {
       await updateTicketStatus(id, 'pending', {
-        pendingUntil: new Date(pendingUntil).toISOString(),
+        pendingUntil: pendingDate.toISOString(),
         pendingReason: pendingReason.trim(),
       });
       setShowPending(false);
@@ -400,8 +410,8 @@ function TicketDetail() {
         <div className={styles.ticketMeta}>
           <span>Müşteri: <strong>{ticket.customer?.name}</strong></span>
           <span>Ajan: <strong>{ticket.assignedTo?.name || 'Atanmamış'}</strong></span>
-          <span>Oluşturma: <strong>{new Date(ticket.createdAt).toLocaleDateString('tr-TR')}</strong></span>
-          {ticket.pendingUntil && <span>Bekleme Sonu: <strong>{new Date(ticket.pendingUntil).toLocaleString('tr-TR')}</strong></span>}
+          <span>Oluşturma: <strong>{formatIstanbulDate(ticket.createdAt)}</strong></span>
+          {ticket.pendingUntil && <span>Bekleme Sonu: <strong>{formatIstanbulDateTime(ticket.pendingUntil)}</strong></span>}
           {ticket.reopenCount > 0 && <span>Yeniden Açılma: <strong>{ticket.reopenCount}</strong></span>}
         </div>
 
@@ -551,7 +561,7 @@ function TicketDetail() {
                 <div className={styles.activityContent}>
                   <div className={styles.activityHeader}>
                     <span className={styles.activityDate}>
-                      {new Date(activity.createdAt).toLocaleString('tr-TR')}
+                      {formatIstanbulDateTime(activity.createdAt)}
                     </span>
                     <span className={styles.activitySource}>{activitySourceLabel(activity.source)}</span>
                   </div>
@@ -584,7 +594,7 @@ function TicketDetail() {
               <div className={styles.commentHeader}>
                 <strong className={styles.commentAuthor}>{c.author?.name}</strong>
                 {c.type === 'internal_note' && <span className={styles.commentBadge}>İç Not</span>}
-                <span className={styles.commentDate}>{new Date(c.createdAt).toLocaleString('tr-TR')}</span>
+                <span className={styles.commentDate}>{formatIstanbulDateTime(c.createdAt)}</span>
               </div>
               <p className={styles.commentBody}>{c.body}</p>
             </div>
