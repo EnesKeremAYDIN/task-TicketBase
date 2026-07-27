@@ -23,7 +23,6 @@ Zammad/Jira benzeri, birden fazla şirketin (tenant) aynı platform üzerinden k
 ├── docs/
 │   ├── TicketBase.md      # Görev spec'i
 │   ├── details.md         # Görev detay özeti
-│   ├── plan.md            # Geliştirme planı
 │   └── users.md           # Kullanıcı hesap listesi
 ├── prisma/
 │   ├── schema.prisma      # Veri modeli
@@ -32,6 +31,7 @@ Zammad/Jira benzeri, birden fazla şirketin (tenant) aynı platform üzerinden k
 │   ├── backend/           # Fastify sunucusu (routes, services, middleware)
 │   ├── frontend/          # React uygulaması (pages, components, lib)
 │   ├── mock-mail-channel/ # Mock e-posta kanalı servisi
+│   ├── shared/            # Frontend/backend ortak zaman dilimi yardımcıları
 │   └── tests/             # Test dosyaları
 ├── ai-transcripts/        # AI konuşma kayıtları
 └── package.json
@@ -165,6 +165,25 @@ Webhook işlemleri `InboundMessage` üzerinde `processing`, `processed` ve `fail
 - Agent hazır yanıtı yorum alanına aktararak göndermeden önce düzenleyebilir.
 - Makrolar yorum, durum, öncelik ve kendime atama işlemlerini tek transaction içinde uygular; başarısızlıkta bütün işlemler geri alınır.
 
+## Zammad Referans İncelemesi
+
+İlk değerlendirme feedback'i sonrasında [Zammad'ın resmi kaynak kodu](https://github.com/zammad/zammad) ve ürün dokümantasyonu incelendi. Kod kopyalamak yerine aşağıdaki destek operasyonu kavramları TicketBase mimarisine uyarlandı:
+
+- Overviews → `My Tickets`, `Unassigned & Open` ve `Escalated` kuyrukları
+- Pending reminder → `pendingUntil` ve otomatik yeniden gündeme gelme
+- Ticket history → actor ve kaynak bilgili `TicketActivity`
+- Text Modules → tenant bazlı hazır yanıtlar
+- Macros → doğrulanan ve atomik ticket aksiyonları
+
+Zammad'ın dinamik workflow, grup, trigger ve etiket altyapıları mevcut görev kapsamına alınmadı.
+
+## Zaman Yönetimi
+
+- Bütün zaman noktaları API ve veritabanında UTC olarak saklanır.
+- Arayüzdeki tarihler ve `datetime-local` kullanıcı girişleri açıkça `Europe/Istanbul` saat diliminde yorumlanır.
+- SLA mesai hesabı hafta içi 09:00-18:00 aralığını IANA `Europe/Istanbul` kuralları ve tenant tatil listesiyle hesaplar.
+- Takvim günü ilerlemelerinde sabit 24 saat veya sabit UTC+3 varsayımı kullanılmaz.
+
 ## Seed Verisi
 
 - **4 tenant**: ACME Corp, Globex Corporation, Initech, Umbrella Inc
@@ -182,12 +201,12 @@ Webhook işlemleri `InboundMessage` üzerinde `processing`, `processed` ve `fail
 
 ## Test Sonuçları
 
-### Otomatik Testler (`npm test`) — 127/127 ✅
+### Otomatik Testler (`npm test`) — 135/135 ✅
 
 ```
-Backend:   116/116
-Frontend:   11/11
-Toplam:    127/127
+Backend:   120/120
+Frontend:   15/15
+Toplam:    135/135
 ```
 
 #### Backend API Testleri
@@ -196,7 +215,7 @@ Toplam:    127/127
 |-------------|-------------|--------|
 | auth.test.ts | 10 | Login, token doğrulama, middleware |
 | ticket.test.ts | 16 | CRUD, kategori filtresi, müşteri liste izolasyonu, yorum görünürlüğü, state machine, sequential number, claim/assign |
-| sla.test.ts | 19 | Business hours, SLA policy, geç/yanıtsız ilk yanıt, geç çözüm ihlalleri, tür ayrımı, comments ve dashboard |
+| sla.test.ts | 23 | IANA Europe/Istanbul mesai/yaz saati sınırları, SLA policy, geç/yanıtsız ilk yanıt, geç çözüm ihlalleri, tür ayrımı, comments ve dashboard |
 | lifecycle.test.ts | 10 | Admin reopen, müşteri çözüm onayı/reddi, pending reminder, follow-up ve gerçek hareketsizliğe göre otomatik kapanma |
 | bulk-ticket.test.ts | 9 | Rol yetkileri, state machine, SLA yeniden hesaplama, ajan atama, tenant izolasyonu, 100 kayıt limiti |
 | activity.test.ts | 8 | Actor/zaman, eski-yeni değer, görünürlük, otomatik işlemler, tenant izolasyonu |
@@ -212,6 +231,7 @@ Toplam:    127/127
 | Modal.test.tsx | 4 | Render, Escape, focus trap, önceki odağa dönüş ve scroll kilidi |
 | ErrorBanner.test.tsx | 2 | Alert erişilebilirliği ve tekrar dene aksiyonu |
 | ThemeToggle.test.tsx | 5 | Tema seçenekleri, erişilebilirlik, seçim, kalıcılık ve HTML uygulaması |
+| date.test.ts | 4 | İstanbul tarih gösterimi, datetime-local → UTC dönüşümü ve geçersiz tarih kontrolü |
 
 ### Tarayıcı E2E Testleri (`npm run test:e2e`) — 12/12 ✅
 
@@ -235,8 +255,8 @@ Ticket Listesi:
    Durum: ✅ BAŞARILI (<300ms)
 
 Dashboard:
-   Ortalama: 43.1ms
-   P95: 77ms
+   Ortalama: 67.8ms
+   P95: 117ms
    Durum: ✅ BAŞARILI (<500ms)
 ```
 

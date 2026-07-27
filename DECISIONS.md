@@ -81,3 +81,27 @@ Dashboard metriklerinde aktif ticket tanımı `new`, `open` ve `pending` durumla
 Zod doğrulamasından geçmeyen webhook payload'ları zorunlu alanları eksik olsa da ham içerik, doğrulama hatası ve bulunabilen kısmi alanlarla `InboundMessage` tablosunda saklanır. Sağlayıcı `messageId` göndermediyse aynı bozuk payload'ın tekrarını ayırt etmek için ham içeriğin SHA-256 hash'i kullanılır. Ticket referansındaki prefix payload tenant'ıyla uyuşmuyorsa mesaj reddedilir.
 
 **Karar:** Yalnızca unique `messageId` hatasında `duplicate` dönmek yarım kalan işlemi iyileştirmediği için yeterli görülmedi. Mesajlar deneme sayısı ve son deneme zamanıyla atomik olarak sahiplenilir. Ticket, yorum veya follow-up oluşturma ile inbound kaydının `processed` yapılması aynı transaction içinde tamamlanır. Beş dakikadan uzun süre `processing` kalan veya `failed` olan mesaj, işletim kuralındaki 24 saatlik retry penceresi içinde aynı kimlikle yeniden denenebilir. Kapalı ticket e-postası web akışıyla aynı follow-up servisini kullanır.
+
+## 2026-07-27 — AI Transkript Kapsamı
+
+OpenCode üzerinde yapılan model değişikliği ve sohbetin uzamasıyla yaşanan sıkışma nedeniyle sağlıklı biçimde dışa aktarılabilen AI transkripti 22 Temmuz'a kadar olan konuşmaları kapsıyor. Bu tarihten sonraki geliştirmeler Git commit geçmişi, kod değişiklikleri, testler ve karar kayıtları üzerinden izlenebilir durumda tutuldu.
+
+**Karar:** Mevcut transkript değiştirilmeden teslim paketinde korunacak ve kapsam sınırı açıkça belirtilecek. Eksik dönem için geriye dönük veya yapay bir konuşma kaydı üretilmeyecek; bunun yerine doğrulanabilir Git geçmişi ve teknik karar kayıtları esas alınacak.
+
+## 2026-07-27 — Production Bağımlılık Güvenliği
+
+Production audit'inde bulunan `fast-uri`, `find-my-way` ve `fast-jwt` açıkları güvenli patch güncellemeleri ve `@fastify/jwt` 10.2.1 yükseltmesiyle giderildi. React Router 7.18.1 için kalan uyarı yalnızca projede kullanılmayan RSC Mode action akışını etkiliyor; uygulama Vite üzerinde klasik `BrowserRouter` SPA olarak çalışıyor.
+
+**Karar:** Güvenlik açığı bulunan eski React Router 7.11 sürümüne düşmek ve desteklenen çalışma ortamını aşan React Router 8 paketini zorlamak reddedildi. Desteklenen güncel 7.x sürümü korunacak, RSC özellikleri kullanılmayacak ve resmi uyumlu düzeltme yayınlandığında paket güncellenecek.
+
+## 2026-07-27 — Europe/Istanbul Zaman Yönetimi
+
+Frontend tarih gösterimi ve `datetime-local` girişleri tarayıcının saat diliminden bağımsız olarak `Europe/Istanbul` üzerinden işlendi. SLA mesai hesabındaki sabit UTC+3 yaklaşımı kaldırılarak IANA'nın güncel ve tarihsel zaman dilimi kuralları ortak bir yardımcı üzerinden kullanılmaya başlandı.
+
+**Karar:** AI, yeni bir tarih kütüphanesi eklemek yerine çalışma ortamının native `Intl.DateTimeFormat` desteğini ve doğrulanan yerel-zaman/UTC dönüşümünü önerdi; gereksiz bağımlılık oluşturmadığı için kabul edildi. Tarayıcının yerel saat dilimine güvenmek ve takvim günü ilerletirken sabit 24 saat eklemek, farklı bölgelerde ve yaz saati sınırlarında hatalı sonuç üretebileceği için reddedildi.
+
+## 2026-07-27 — Zammad Referans İncelemesi
+
+İlk değerlendirme feedback'i sonrasında Zammad'ın resmi kaynak deposundaki ticket modeli, pending reminder, history ve doğrulanan aksiyon yapıları; ayrıca Overviews, Macros ve Text Modules dokümanları incelendi. Bu yapılar TicketBase'in yaşam döngüsü, kuyruk, audit ve otomasyon ihtiyaçlarıyla karşılaştırıldı.
+
+**Karar:** Zammad kodu kopyalanmadan ürün kavramları mevcut TypeScript, Fastify ve Prisma mimarisine uyarlandı. Overviews yaklaşımı destek kuyruklarına, pending reminder yaklaşımı `pendingUntil` akışına, history yaklaşımı `TicketActivity` modeline, Text Modules ve Macros yaklaşımları ise hazır yanıtlar ile doğrulanan atomik ticket makrolarına dönüştürüldü. Dinamik workflow, grup, trigger ve etiket altyapıları mevcut görev kapsamı için gereksiz karmaşıklık oluşturacağı için alınmadı.
